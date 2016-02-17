@@ -74,7 +74,7 @@ public:
     	theElements[i] = value;
     }
 
-    void setId(const long int id)
+    void setId(const unsigned int id)
     {
     	theId = id;
     }

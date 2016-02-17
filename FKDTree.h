@@ -47,8 +47,9 @@ public:
 			x.resize(theNumberOfPoints);
 		theIntervalLength.resize(theNumberOfPoints, 0);
 		theIntervalMin.resize(theNumberOfPoints, 0);
-		theIds.reserve(theNumberOfPoints);
+		theIds.resize(theNumberOfPoints,0);
 		thePoints=points;
+
 
 	}
 
@@ -81,10 +82,14 @@ public:
 
 	KDPoint<TYPE, numberOfDimensions> getPoint(unsigned int index) const
 	{
+
 		KDPoint<TYPE, numberOfDimensions> point;
+
 		for (int i = 0; i < numberOfDimensions; ++i)
 			point.setDimension(i, theDimensions[i][index]);
+
 		point.setId(theIds[index]);
+
 		return point;
 	}
 
@@ -191,6 +196,7 @@ public:
 			inTheBox &= (theDimensions[i][index] <= maxPoint[i]
 					&& theDimensions[i][index] >= minPoint[i]);
 		}
+
 		return inTheBox;
 	}
 
@@ -202,8 +208,10 @@ public:
 		std::vector<KDPoint<TYPE, numberOfDimensions> > result;
 
 		indecesToVisit.push_back(0);
+
 		for (int depth = 0; depth < theDepth + 1; ++depth)
 		{
+
 			int dimension = depth % numberOfDimensions;
 			unsigned int numberOfIndecesToVisitThisDepth =
 					indecesToVisit.size();
@@ -211,10 +219,12 @@ public:
 					visitedIndecesThisDepth < numberOfIndecesToVisitThisDepth;
 					visitedIndecesThisDepth++)
 			{
+
 				unsigned int index = indecesToVisit[visitedIndecesThisDepth];
 //				assert(index >= 0 && index < theNumberOfPoints);
 				bool intersection = intersects(index, minPoint, maxPoint,
 						dimension);
+
 				if (intersection && isInTheBox(index, minPoint, maxPoint))
 					result.push_back(getPoint(index));
 
@@ -228,8 +238,10 @@ public:
 				for (int whichSon = startSon; whichSon < endSon + 1; ++whichSon)
 				{
 					unsigned int indexToAdd = leftSonIndex(index) + whichSon;
+
 					if (indexToAdd < theNumberOfPoints)
 					{
+
 
 //						assert(
 //								indexToAdd >= (1 << (depth + 1)) - 1
@@ -238,13 +250,15 @@ public:
 						indecesToVisit.push_back(indexToAdd);
 					}
 
+
 				}
 
 			}
+//			std::cout << "starting " <<numberOfIndecesToVisitThisDepth<< std::endl;
+//			std::cout << "finishing " <<numberOfIndecesToVisitThisDepth<< std::endl;
 
 			indecesToVisit.erase(indecesToVisit.begin(),
 					indecesToVisit.begin() + numberOfIndecesToVisitThisDepth);
-
 		}
 		return result;
 	}
