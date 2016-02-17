@@ -5,6 +5,7 @@
 #include <sstream>
 #include <unistd.h>
 #include <thread>
+
 typedef struct float4
 {
 	float x;

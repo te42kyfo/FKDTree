@@ -160,13 +160,13 @@ public:
 	}
 
 	inline
-	unsigned int leftSonIndex(unsigned int index)
+	unsigned int leftSonIndex(unsigned int index) const
 	{
 		return 2 * index + 1;
 	}
 
 	inline
-	unsigned int rightSonIndex(unsigned int index)
+	unsigned int rightSonIndex(unsigned int index) const
 	{
 		return 2 * index + 2;
 	}
@@ -174,7 +174,7 @@ public:
 	inline
 	bool intersects(unsigned int index,
 			const KDPoint<TYPE, numberOfDimensions>& minPoint,
-			const KDPoint<TYPE, numberOfDimensions>& maxPoint, int dimension)
+			const KDPoint<TYPE, numberOfDimensions>& maxPoint, int dimension) const
 	{
 		return (theDimensions[dimension][index] <= maxPoint[dimension]
 				&& theDimensions[dimension][index] >= minPoint[dimension]);
@@ -183,7 +183,7 @@ public:
 	inline
 	bool isInTheBox(unsigned int index,
 			const KDPoint<TYPE, numberOfDimensions>& minPoint,
-			const KDPoint<TYPE, numberOfDimensions>& maxPoint)
+			const KDPoint<TYPE, numberOfDimensions>& maxPoint) const
 	{
 		bool inTheBox = true;
 		for (int i = 0; i < numberOfDimensions; ++i)
@@ -196,7 +196,7 @@ public:
 
 	std::vector<KDPoint<TYPE, numberOfDimensions> > search_in_the_box(
 			const KDPoint<TYPE, numberOfDimensions>& minPoint,
-			const KDPoint<TYPE, numberOfDimensions>& maxPoint)
+			const KDPoint<TYPE, numberOfDimensions>& maxPoint)  const
 	{
 		std::deque<unsigned int> indecesToVisit;
 		std::vector<KDPoint<TYPE, numberOfDimensions> > result;
@@ -249,7 +249,7 @@ public:
 		return result;
 	}
 
-	bool test_correct_build(unsigned int index=0, int dimension=0)
+	bool test_correct_build(unsigned int index=0, int dimension=0) const
 	{
 
 		unsigned int leftSonIndexInArray = 2 * index + 1;
@@ -297,7 +297,7 @@ private:
 	{
 		if (length == 1)
 			return 0;
-		int index = 1 << ((int) log2(length));
+		unsigned int index = 1 << ((int) log2(length));
 
 		if ((index / 2) - 1 <= length - index)
 			return index - 1;
