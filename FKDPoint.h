@@ -27,23 +27,6 @@ public:
 
 	}
 
-//	FKDPoint(FKDPoint<TYPE, numberOfDimensions> && other):
-//	theId(std::move(other.theId)), theElements(std::move(other.theElements))
-//	{
-//
-//	}
-
-//	FKDPoint<TYPE, numberOfDimensions>& operator=(FKDPoint<TYPE, numberOfDimensions>&& other)
-//	{
-//
-//		if (this != &other)
-//		{
-//			theId=std::move(other.theId);
-//			theElements=std::move(other.theElements);
-//		}
-//		return *this;
-//	}
-
 	template<class T>
 	FKDPoint<TYPE, numberOfDimensions> & operator=(
 			const FKDPoint<TYPE, numberOfDimensions> & other)

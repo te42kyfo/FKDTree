@@ -115,7 +115,6 @@ public:
 	{
 
 		thePoints.push_back(point);
-#pragma unroll
 		for (int i = 0; i < numberOfDimensions; ++i)
 			theDimensions.at(i).push_back(point[i]);
 		theIds.push_back(point.getId());
@@ -125,7 +124,6 @@ public:
 	{
 
 		thePoints.push_back(point);
-#pragma unroll
 		for (int i = 0; i < numberOfDimensions; ++i)
 			theDimensions.at(i).push_back(point[i]);
 		theIds.push_back(point.getId());
@@ -164,7 +162,55 @@ public:
 
 	std::vector<unsigned int> search_in_the_box(
 			const FKDPoint<TYPE, numberOfDimensions>&,
-			const FKDPoint<TYPE, numberOfDimensions>&) const;
+			const FKDPoint<TYPE, numberOfDimensions>&) const
+	{
+		FQueue<unsigned int> indecesToVisit(128);
+		std::vector<unsigned int> result;
+		result.reserve(16);
+		indecesToVisit.push_back(0);
+
+		for (int depth = 0; depth < theDepth + 1; ++depth)
+		{
+
+			int dimension = depth % numberOfDimensions;
+			unsigned int numberOfIndecesToVisitThisDepth =
+					indecesToVisit.size();
+			for (unsigned int visitedIndecesThisDepth = 0;
+					visitedIndecesThisDepth < numberOfIndecesToVisitThisDepth;
+					visitedIndecesThisDepth++)
+			{
+
+				unsigned int index = indecesToVisit[visitedIndecesThisDepth];
+				bool intersection = intersects(index, minPoint, maxPoint,
+						dimension);
+
+				if (intersection && is_in_the_box(index, minPoint, maxPoint))
+					result.push_back(theIds[index]);
+
+				bool isLowerThanBoxMin = theDimensions[dimension][index]
+						< minPoint[dimension];
+
+				int startSon = isLowerThanBoxMin; //left son = 0, right son =1
+
+				int endSon = isLowerThanBoxMin || intersection;
+
+				for (int whichSon = startSon; whichSon < endSon + 1; ++whichSon)
+				{
+					unsigned int indexToAdd = leftSonIndex(index) + whichSon;
+
+					if (indexToAdd < theNumberOfPoints)
+					{
+						indecesToVisit.push_back(indexToAdd);
+					}
+
+				}
+
+			}
+
+			indecesToVisit.pop_front(numberOfIndecesToVisitThisDepth);
+		}
+		return result;
+	}
 
 	bool test_correct_build(unsigned int index = 0, int dimension = 0) const
 	{
@@ -265,7 +311,73 @@ public:
 	{
 		return theIds;
 	}
-	void build();
+	void build()
+	{
+		//gather kdtree building
+		int dimension;
+		theIntervalMin[0] = 0;
+		theIntervalLength[0] = theNumberOfPoints;
+
+		for (int depth = 0; depth < theDepth; ++depth)
+		{
+
+			dimension = depth % numberOfDimensions;
+			unsigned int firstIndexInDepth = (1 << depth) - 1;
+			for (int indexInDepth = 0; indexInDepth < (1 << depth); ++indexInDepth)
+			{
+				unsigned int indexInArray = firstIndexInDepth + indexInDepth;
+				unsigned int leftSonIndexInArray = 2 * indexInArray + 1;
+				unsigned int rightSonIndexInArray = leftSonIndexInArray + 1;
+
+				unsigned int whichElementInInterval = partition_complete_kdtree(
+						theIntervalLength[indexInArray]);
+				std::nth_element(thePoints.begin() + theIntervalMin[indexInArray],
+						thePoints.begin() + theIntervalMin[indexInArray]
+								+ whichElementInInterval,
+						thePoints.begin() + theIntervalMin[indexInArray]
+								+ theIntervalLength[indexInArray],
+						[dimension](const FKDPoint<TYPE,numberOfDimensions> & a, const FKDPoint<TYPE,numberOfDimensions> & b) -> bool
+						{
+							if(a[dimension] == b[dimension])
+							return a.getId() < b.getId();
+							else
+							return a[dimension] < b[dimension];
+						});
+				add_at_position(
+						thePoints[theIntervalMin[indexInArray]
+								+ whichElementInInterval], indexInArray);
+
+				if (leftSonIndexInArray < theNumberOfPoints)
+				{
+					theIntervalMin[leftSonIndexInArray] =
+							theIntervalMin[indexInArray];
+					theIntervalLength[leftSonIndexInArray] = whichElementInInterval;
+				}
+
+				if (rightSonIndexInArray < theNumberOfPoints)
+				{
+					theIntervalMin[rightSonIndexInArray] =
+							theIntervalMin[indexInArray] + whichElementInInterval
+									+ 1;
+					theIntervalLength[rightSonIndexInArray] =
+							(theIntervalLength[indexInArray] - 1
+									- whichElementInInterval);
+				}
+			}
+		}
+
+		dimension = theDepth % numberOfDimensions;
+		unsigned int firstIndexInDepth = (1 << theDepth) - 1;
+		unsigned int indexInArray = firstIndexInDepth;
+		for (unsigned int indexInArray = firstIndexInDepth;
+				indexInArray < theNumberOfPoints; ++indexInArray)
+		{
+			add_at_position(thePoints[theIntervalMin[indexInArray]], indexInArray);
+
+		}
+
+	}
+
 private:
 
 	unsigned int partition_complete_kdtree(unsigned int length)
@@ -281,15 +393,39 @@ private:
 
 	}
 
-	unsigned int leftSonIndex(unsigned int index) const;
-	unsigned int rightSonIndex(unsigned int index) const;
+	unsigned int leftSonIndex(unsigned int index) const
+	{
+		return 2 * index + 1;
+	}
+
+	unsigned int rightSonIndex(unsigned int index) const
+	{
+		return 2 * index + 2;
+	}
+
 	bool intersects(unsigned int index,
 			const FKDPoint<TYPE, numberOfDimensions>& minPoint,
 			const FKDPoint<TYPE, numberOfDimensions>& maxPoint,
-			int dimension) const;
-	bool isInTheBox(unsigned int index,
+			int dimension) const
+	{
+		return (theDimensions[dimension][index] <= maxPoint[dimension]
+				&& theDimensions[dimension][index] >= minPoint[dimension]);
+	}
+
+	bool is_in_the_box(unsigned int index,
 			const FKDPoint<TYPE, numberOfDimensions>& minPoint,
-			const FKDPoint<TYPE, numberOfDimensions>& maxPoint) const;
+			const FKDPoint<TYPE, numberOfDimensions>& maxPoint) const
+	{
+		bool inTheBox = true;
+		for (int i = 0; i < numberOfDimensions; ++i)
+		{
+			inTheBox &= (theDimensions[i][index] <= maxPoint[i]
+					&& theDimensions[i][index] >= minPoint[i]);
+		}
+
+		return inTheBox;
+	}
+
 	long int theNumberOfPoints;
 	int theDepth;
 	std::vector<FKDPoint<TYPE, numberOfDimensions> > thePoints;
@@ -300,177 +436,5 @@ private:
 
 };
 
-template<class TYPE, int numberOfDimensions>
-std::vector<unsigned int> FKDTree<TYPE, numberOfDimensions>::search_in_the_box(
-		const FKDPoint<TYPE, numberOfDimensions>& minPoint,
-		const FKDPoint<TYPE, numberOfDimensions>& maxPoint) const
-{
-//			std::deque<unsigned int> indecesToVisit;
-	FQueue<unsigned int> indecesToVisit(128);
-	std::vector<unsigned int> result;
-	result.reserve(16);
-	indecesToVisit.push_back(0);
-
-	for (int depth = 0; depth < theDepth + 1; ++depth)
-	{
-
-		int dimension = depth % numberOfDimensions;
-		unsigned int numberOfIndecesToVisitThisDepth = indecesToVisit.size();
-		for (unsigned int visitedIndecesThisDepth = 0;
-				visitedIndecesThisDepth < numberOfIndecesToVisitThisDepth;
-				visitedIndecesThisDepth++)
-		{
-
-			unsigned int index = indecesToVisit[visitedIndecesThisDepth];
-			//				assert(index >= 0 && index < theNumberOfPoints);
-			bool intersection = intersects(index, minPoint, maxPoint,
-					dimension);
-
-			if (intersection && isInTheBox(index, minPoint, maxPoint))
-				result.push_back(theIds[index]);
-
-			bool isLowerThanBoxMin = theDimensions[dimension][index]
-					< minPoint[dimension];
-
-			int startSon = isLowerThanBoxMin; //left son = 0, right son =1
-
-			int endSon = isLowerThanBoxMin || intersection;
-
-			for (int whichSon = startSon; whichSon < endSon + 1; ++whichSon)
-			{
-				unsigned int indexToAdd = leftSonIndex(index) + whichSon;
-
-				if (indexToAdd < theNumberOfPoints)
-				{
-
-					//						assert(
-					//								indexToAdd >= (1 << (depth + 1)) - 1
-					//										&& leftSonIndex(index) + whichSon
-					//												< ((1 << (depth + 2)) - 1));
-					indecesToVisit.push_back(indexToAdd);
-				}
-
-			}
-
-		}
-
-		indecesToVisit.pop_front(numberOfIndecesToVisitThisDepth);
-//					indecesToVisit.erase(indecesToVisit.begin(),
-//							indecesToVisit.begin() + numberOfIndecesToVisitThisDepth);
-	}
-	return result;
-}
-
-template<class TYPE, int numberOfDimensions>
-
-void FKDTree<TYPE, numberOfDimensions>::build()
-{
-	//gather kdtree building
-	int dimension;
-	theIntervalMin[0] = 0;
-	theIntervalLength[0] = theNumberOfPoints;
-
-	for (int depth = 0; depth < theDepth; ++depth)
-	{
-
-		dimension = depth % numberOfDimensions;
-		unsigned int firstIndexInDepth = (1 << depth) - 1;
-		for (int indexInDepth = 0; indexInDepth < (1 << depth); ++indexInDepth)
-		{
-			unsigned int indexInArray = firstIndexInDepth + indexInDepth;
-			unsigned int leftSonIndexInArray = 2 * indexInArray + 1;
-			unsigned int rightSonIndexInArray = leftSonIndexInArray + 1;
-
-			unsigned int whichElementInInterval = partition_complete_kdtree(
-					theIntervalLength[indexInArray]);
-			std::nth_element(thePoints.begin() + theIntervalMin[indexInArray],
-					thePoints.begin() + theIntervalMin[indexInArray]
-							+ whichElementInInterval,
-					thePoints.begin() + theIntervalMin[indexInArray]
-							+ theIntervalLength[indexInArray],
-					[dimension](const FKDPoint<TYPE,numberOfDimensions> & a, const FKDPoint<TYPE,numberOfDimensions> & b) -> bool
-					{
-						if(a[dimension] == b[dimension])
-						return a.getId() < b.getId();
-						else
-						return a[dimension] < b[dimension];
-					});
-			add_at_position(
-					thePoints[theIntervalMin[indexInArray]
-							+ whichElementInInterval], indexInArray);
-
-			if (leftSonIndexInArray < theNumberOfPoints)
-			{
-				theIntervalMin[leftSonIndexInArray] =
-						theIntervalMin[indexInArray];
-				theIntervalLength[leftSonIndexInArray] = whichElementInInterval;
-			}
-
-			if (rightSonIndexInArray < theNumberOfPoints)
-			{
-				theIntervalMin[rightSonIndexInArray] =
-						theIntervalMin[indexInArray] + whichElementInInterval
-								+ 1;
-				theIntervalLength[rightSonIndexInArray] =
-						(theIntervalLength[indexInArray] - 1
-								- whichElementInInterval);
-			}
-		}
-	}
-
-	dimension = theDepth % numberOfDimensions;
-	unsigned int firstIndexInDepth = (1 << theDepth) - 1;
-	unsigned int indexInArray = firstIndexInDepth;
-	for (unsigned int indexInArray = firstIndexInDepth;
-			indexInArray < theNumberOfPoints; ++indexInArray)
-	{
-		add_at_position(thePoints[theIntervalMin[indexInArray]], indexInArray);
-
-	}
-
-}
-
-template<class TYPE, int numberOfDimensions>
-
-unsigned int FKDTree<TYPE, numberOfDimensions>::leftSonIndex(
-		unsigned int index) const
-{
-	return 2 * index + 1;
-}
-
-template<class TYPE, int numberOfDimensions>
-
-unsigned int FKDTree<TYPE, numberOfDimensions>::rightSonIndex(
-		unsigned int index) const
-{
-	return 2 * index + 2;
-}
-
-template<class TYPE, int numberOfDimensions>
-
-bool FKDTree<TYPE, numberOfDimensions>::intersects(unsigned int index,
-		const FKDPoint<TYPE, numberOfDimensions>& minPoint,
-		const FKDPoint<TYPE, numberOfDimensions>& maxPoint, int dimension) const
-{
-	return (theDimensions[dimension][index] <= maxPoint[dimension]
-			&& theDimensions[dimension][index] >= minPoint[dimension]);
-}
-
-template<class TYPE, int numberOfDimensions>
-
-bool FKDTree<TYPE, numberOfDimensions>::isInTheBox(unsigned int index,
-		const FKDPoint<TYPE, numberOfDimensions>& minPoint,
-		const FKDPoint<TYPE, numberOfDimensions>& maxPoint) const
-{
-	bool inTheBox = true;
-#pragma unroll
-	for (int i = 0; i < numberOfDimensions; ++i)
-	{
-		inTheBox &= (theDimensions[i][index] <= maxPoint[i]
-				&& theDimensions[i][index] >= minPoint[i]);
-	}
-
-	return inTheBox;
-}
 
 #endif /* FKDTREE_FKDTREE_H_ */
