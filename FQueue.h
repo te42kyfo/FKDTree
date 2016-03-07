@@ -84,7 +84,10 @@ public:
 		return *this;
 
 	}
-	~FQueue();
+	~FQueue()
+	{
+
+	}
 
 	unsigned int capacity() const
 	{
