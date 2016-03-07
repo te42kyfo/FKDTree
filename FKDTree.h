@@ -161,8 +161,8 @@ public:
 	}
 
 	std::vector<unsigned int> search_in_the_box(
-			const FKDPoint<TYPE, numberOfDimensions>&,
-			const FKDPoint<TYPE, numberOfDimensions>&) const
+			const FKDPoint<TYPE, numberOfDimensions>& minPoint,
+			const FKDPoint<TYPE, numberOfDimensions>& maxPoint) const
 	{
 		FQueue<unsigned int> indecesToVisit(128);
 		std::vector<unsigned int> result;

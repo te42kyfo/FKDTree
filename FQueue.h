@@ -130,7 +130,7 @@ public:
 
 		}
 
-		theBuffer[theTail] = v;
+		theBuffer[theTail] = value;
 		theTail = (theTail + 1) % theBuffer.size();
 		theSize++;
 
