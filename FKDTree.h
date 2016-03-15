@@ -6,9 +6,6 @@
 #include <algorithm>
 #include <cmath>
 #include <utility>
-#include <iostream>
-#include <deque>
-#include <cassert>
 
 #include "FKDPoint.h"
 #include "FQueue.h"
@@ -19,7 +16,7 @@ class FKDTree
 
 public:
 
-	FKDTree(const long int nPoints)
+	FKDTree(const unsigned int nPoints)
 	{
 		theNumberOfPoints = nPoints;
 		theDepth = std::floor(log2(nPoints));
@@ -32,7 +29,7 @@ public:
 
 	}
 
-	FKDTree(const long int nPoints,
+	FKDTree(const unsigned int nPoints,
 			const std::vector<FKDPoint<TYPE, numberOfDimensions> >& points)
 	{
 		theNumberOfPoints = nPoints;
@@ -57,8 +54,6 @@ public:
 		theIds.clear();
 		thePoints.clear();
 	}
-
-	FKDTree(unsigned int capacity);
 
 	FKDTree(const FKDTree<TYPE, numberOfDimensions>& v);
 
@@ -160,6 +155,58 @@ public:
 		return point;
 	}
 
+
+	std::vector<unsigned int> search_in_the_box_branchless(const FKDPoint<TYPE, numberOfDimensions>& minPoint,
+			const FKDPoint<TYPE, numberOfDimensions>& maxPoint)
+	{
+		FQueue<unsigned int> indecesToVisit(128);
+		std::vector<unsigned int> foundPoints;
+		foundPoints.reserve(16);
+		indecesToVisit.push_back(0);
+
+		for (int depth = 0; depth < theDepth + 1; ++depth)
+		{
+
+			int dimension = depth % numberOfDimensions;
+			unsigned int numberOfIndecesToVisitThisDepth =
+					indecesToVisit.size();
+			for (unsigned int visitedIndecesThisDepth = 0;
+					visitedIndecesThisDepth < numberOfIndecesToVisitThisDepth;
+					visitedIndecesThisDepth++)
+			{
+
+
+				unsigned int index = indecesToVisit[visitedIndecesThisDepth];
+				bool intersection = intersects(index, minPoint, maxPoint,
+						dimension);
+				unsigned int firstSonToVisitNext = leftSonIndex(index);
+				int maxNumberOfSonsToVisitNext = (firstSonToVisitNext < theNumberOfPoints) + ((firstSonToVisitNext+1) < theNumberOfPoints);
+				int numberOfSonsToVisitNext;
+
+				if (intersection)
+				{
+					if(is_in_the_box(index, minPoint, maxPoint))
+					{
+						foundPoints.emplace_back(theIds[index]);
+					}
+					numberOfSonsToVisitNext = maxNumberOfSonsToVisitNext;
+				}
+				else
+				{
+
+					numberOfSonsToVisitNext = std::min(maxNumberOfSonsToVisitNext,1);
+					firstSonToVisitNext += (theDimensions[dimension][index]< minPoint[dimension]);
+				}
+
+				for(int whichSon = 0; whichSon < numberOfSonsToVisitNext; ++whichSon)
+					indecesToVisit.push_back(firstSonToVisitNext+whichSon);
+			}
+
+			indecesToVisit.pop_front(numberOfIndecesToVisitThisDepth);
+		}
+		return foundPoints;
+	}
+
 	std::vector<unsigned int> search_in_the_box(
 			const FKDPoint<TYPE, numberOfDimensions>& minPoint,
 			const FKDPoint<TYPE, numberOfDimensions>& maxPoint) const
@@ -212,6 +259,43 @@ public:
 		return result;
 	}
 
+	void search_in_the_box_recursive(const FKDPoint<TYPE, numberOfDimensions>& minPoint,
+			const FKDPoint<TYPE, numberOfDimensions>& maxPoint, std::vector<unsigned int>& foundPoints,unsigned int index=0, int dimension=0) const
+	{
+
+		unsigned int firstSonToVisitNext = leftSonIndex(index);
+		int maxNumberOfSonsToVisitNext = (firstSonToVisitNext < theNumberOfPoints) + ((firstSonToVisitNext+1) < theNumberOfPoints);
+		bool intersection = intersects(index, minPoint, maxPoint,
+				dimension);
+
+		int numberOfSonsToVisitNext;
+		if (intersection)
+		{
+			if(is_in_the_box(index, minPoint, maxPoint))
+			{
+				foundPoints.emplace_back(theIds[index]);
+			}
+			numberOfSonsToVisitNext = maxNumberOfSonsToVisitNext;
+		}
+		else
+		{
+			bool isLowerThanBoxMin = theDimensions[dimension][index]
+					< minPoint[dimension];
+			numberOfSonsToVisitNext = isLowerThanBoxMin && (maxNumberOfSonsToVisitNext==1)? 0: std::min(maxNumberOfSonsToVisitNext,1);
+			firstSonToVisitNext += isLowerThanBoxMin;
+
+
+		}
+
+		if(numberOfSonsToVisitNext != 0)
+
+		{
+		auto nextDimension = (dimension+1) % numberOfDimensions;
+		for(int whichSon = 0; whichSon < numberOfSonsToVisitNext; ++whichSon)
+			search_in_the_box_recursive(minPoint, maxPoint, foundPoints,firstSonToVisitNext+whichSon,nextDimension);
+		}
+
+	}
 	bool test_correct_build(unsigned int index = 0, int dimension = 0) const
 	{
 
@@ -295,9 +379,6 @@ public:
 			}
 		}
 
-		if (testGood)
-			std::cout << "Search correctness test completed successfully."
-					<< std::endl;
 		return testGood;
 	}
 
@@ -416,14 +497,14 @@ private:
 			const FKDPoint<TYPE, numberOfDimensions>& minPoint,
 			const FKDPoint<TYPE, numberOfDimensions>& maxPoint) const
 	{
-		bool inTheBox = true;
 		for (int i = 0; i < numberOfDimensions; ++i)
 		{
-			inTheBox &= (theDimensions[i][index] <= maxPoint[i]
-					&& theDimensions[i][index] >= minPoint[i]);
+			if ((theDimensions[i][index] <= maxPoint[i]
+					&& theDimensions[i][index] >= minPoint[i]) == false)
+				return false;
 		}
 
-		return inTheBox;
+		return true;;
 	}
 
 	long int theNumberOfPoints;

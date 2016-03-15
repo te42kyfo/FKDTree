@@ -110,9 +110,10 @@ public:
 	}
 	void push_back(const T & value)
 	{
-		if (theSize >= theBuffer.size())
+		auto bufferSize = theBuffer.size();
+		if (theSize >= bufferSize)
 		{
-			auto oldCapacity = theBuffer.size();
+			auto oldCapacity = bufferSize;
 			auto oldTail = theTail;
 			theBuffer.reserve(oldCapacity + theTail);
 
@@ -134,7 +135,7 @@ public:
 		}
 
 		theBuffer[theTail] = value;
-		theTail = (theTail + 1) % theBuffer.size();
+		theTail = (theTail + 1) % bufferSize;
 		theSize++;
 
 	}

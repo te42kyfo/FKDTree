@@ -2,8 +2,8 @@ CFLAGS= -std=c++11 -ftree-vectorize -march=native -ffast-math -Ofast -march=nati
 LIBS = -ltbb
 
 CUDAOBJECT =
-USE_CUDA = YES
-USE_OPENCL = YES
+USE_CUDA = NO
+USE_OPENCL = NO
 
 CC=g++
 NVCC=nvcc

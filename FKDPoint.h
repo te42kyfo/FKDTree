@@ -7,10 +7,9 @@
 
 #ifndef FKDTREE_KDPOINT_H_
 #define FKDTREE_KDPOINT_H_
-#include <type_traits>
 #include <array>
 #include <utility>
-
+#include <iostream>
 template<class TYPE, int numberOfDimensions>
 class FKDPoint
 {
@@ -42,7 +41,6 @@ public:
 
 	FKDPoint(TYPE x, TYPE y, unsigned int id)
 	{
-		static_assert( numberOfDimensions == 2, "Point dimensionality differs from the number of passed arguments." );
 		theId = id;
 		theElements[0] = x;
 		theElements[1] = y;
@@ -50,7 +48,6 @@ public:
 
 	FKDPoint(TYPE x, TYPE y, TYPE z, unsigned int id)
 	{
-		static_assert( numberOfDimensions == 3, "Point dimensionality differs from the number of passed arguments." );
 		theId = id;
 		theElements[0] = x;
 		theElements[1] = y;
@@ -59,7 +56,6 @@ public:
 
 	FKDPoint(TYPE x, TYPE y, TYPE z, TYPE w, unsigned int id)
 	{
-		static_assert( numberOfDimensions == 4, "Point dimensionality differs from the number of passed arguments." );
 		theId = id;
 		theElements[0] = x;
 		theElements[1] = y;
