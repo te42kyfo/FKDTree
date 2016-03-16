@@ -34,7 +34,7 @@ public:
 			const std::vector<FKDPoint<TYPE, numberOfDimensions> >& points)
 	{
 		theNumberOfPoints = nPoints;
-		theDepth = std::floor(log2(nPoints));
+		theDepth = FLOOR_LOG2(nPoints);
 		for (auto& x : theDimensions)
 			x.resize(theNumberOfPoints);
 		theIntervalLength.resize(theNumberOfPoints, 0);
@@ -217,7 +217,7 @@ public:
 			const FKDPoint<TYPE, numberOfDimensions>& minPoint,
 			const FKDPoint<TYPE, numberOfDimensions>& maxPoint) const
 	{
-		FQueue<unsigned int> indecesToVisit(1000);
+		FQueue<unsigned int> indecesToVisit(128);
 		std::vector<unsigned int> result;
 		result.reserve(16);
 		indecesToVisit.push_back(0);

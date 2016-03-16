@@ -18,9 +18,10 @@ public:
 	{
 
 		theSize = 0;
-		theBuffer(0);
+//		theBuffer(0);
 		theFront = 0;
 		theTail = 0;
+		theCapacity = 0;
 
 	}
 
@@ -30,6 +31,8 @@ public:
 		theSize = 0;
 		theFront = 0;
 		theTail = 0;
+
+		theCapacity = initialCapacity;
 	}
 
 	FQueue(const FQueue<T> & v)
@@ -38,12 +41,14 @@ public:
 		theBuffer = v.theBuffer;
 		theFront = v.theFront;
 		theTail = v.theTail;
+		theCapacity = v.theCapacity;
 	}
 
 	FQueue(FQueue<T> && other) :
 			theSize(0), theFront(0), theTail(0)
 	{
-		theBuffer.clear();
+//		theBuffer.clear();
+		theCapacity = other.theCapacity;
 		theSize = other.theSize;
 		theFront = other.theFront;
 		theTail = other.theTail;
@@ -58,7 +63,7 @@ public:
 
 		if (this != &other)
 		{
-			theBuffer.clear();
+//			theBuffer.clear();
 			theSize = other.theSize;
 			theFront = other.theFront;
 			theTail = other.theTail;
@@ -75,7 +80,7 @@ public:
 	{
 		if (this != &v)
 		{
-			theBuffer.clear();
+//			theBuffer.clear();
 			theSize = v.theSize;
 			theBuffer = v.theBuffer;
 			theFront = v.theFront;
@@ -86,13 +91,8 @@ public:
 	}
 	~FQueue()
 	{
-
 	}
 
-	unsigned int capacity() const
-	{
-		return theBuffer.capacity();
-	}
 	unsigned int size() const
 	{
 		return theSize;
@@ -108,42 +108,62 @@ public:
 	{
 		return theBuffer[theTail];
 	}
+
 	void push_back(const T & value)
 	{
-		auto bufferSize = theBuffer.size();
-		if (theSize >= bufferSize)
-		{
-			auto oldCapacity = bufferSize;
-			auto oldTail = theTail;
-			theBuffer.reserve(oldCapacity + theTail);
+//		bool willprint = false;
 
+		if (theSize >= theCapacity)
+		{
+//			std::cout << "pushing " << value << std::endl;
+//			print();
+//			willprint = true;
+			auto oldTail = theTail;
+			theBuffer.reserve(theCapacity + theTail);
 			if (theFront != 0)
 			{
 				for (int i = 0; i < theTail; ++i)
 				{
 					theBuffer.push_back(theBuffer[i]);
 				}
-				theTail = 0;
+				theCapacity += theTail;
 
+				theTail = 0;
 			}
 			else
 			{
-				theBuffer.resize(oldCapacity + 16);
-				theTail += oldCapacity;
+
+				theBuffer.resize(theCapacity + 16);
+				theTail += theCapacity;
+				theCapacity += 16;
+
 			}
 
 		}
-
+//		if(willprint)
+//			print();
 		theBuffer[theTail] = value;
-		theTail = (theTail + 1) % bufferSize;
+		theTail = (theTail + 1) % theCapacity;
+
 		theSize++;
+
+		if(theCapacity != theBuffer.size())
+				std::cout << "error " << theCapacity << " " <<theBuffer.size() << std::endl;
+
+	}
+
+	void print()
+	{
+		std::cout << "printing the content of the queue:" << std::endl;
+		for(unsigned int i = theFront;  i  != theTail; i = ( i+ 1) % theCapacity)
+			std::cout << theBuffer[i] << " at position " << i << std::endl;
 
 	}
 	void pop_front()
 	{
 		if (theSize > 0)
 		{
-			theFront = (theFront + 1) % theBuffer.size();
+			theFront = (theFront + 1) % theCapacity;
 			theSize--;
 		}
 	}
@@ -154,7 +174,7 @@ public:
 				theSize > numberOfElementsToPop ?
 						numberOfElementsToPop : theSize;
 		theSize -= elementsToErase;
-		theFront = (theFront + elementsToErase) % theBuffer.size();
+		theFront = (theFront + elementsToErase) % theCapacity;
 	}
 
 	void reserve(unsigned int capacity)
@@ -169,12 +189,12 @@ public:
 
 	T & operator[](unsigned int index)
 	{
-		return theBuffer[(theFront + index) % theBuffer.size()];
+		return theBuffer[(theFront + index) % theCapacity];
 	}
 
 	void clear()
 	{
-		theBuffer.clear();
+//		theBuffer.clear();
 		theSize = 0;
 		theFront = 0;
 		theTail = 0;
@@ -184,6 +204,8 @@ private:
 	unsigned int theFront;
 	unsigned int theTail;
 	std::vector<T> theBuffer;
+
+	unsigned int theCapacity;
 
 };
 
