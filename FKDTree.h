@@ -9,6 +9,7 @@
 
 #include "FKDPoint.h"
 #include "FQueue.h"
+#define FLOOR_LOG2(X) ((unsigned int) (31 - __builtin_clz(X | 1)))
 
 template<class TYPE, int numberOfDimensions>
 class FKDTree
@@ -19,7 +20,7 @@ public:
 	FKDTree(const unsigned int nPoints)
 	{
 		theNumberOfPoints = nPoints;
-		theDepth = std::floor(log2(nPoints));
+		theDepth = FLOOR_LOG2(nPoints);
 		for (auto& x : theDimensions)
 			x.resize(theNumberOfPoints);
 		theIntervalLength.resize(theNumberOfPoints, 0);
@@ -159,16 +160,22 @@ public:
 	std::vector<unsigned int> search_in_the_box_branchless(const FKDPoint<TYPE, numberOfDimensions>& minPoint,
 			const FKDPoint<TYPE, numberOfDimensions>& maxPoint)
 	{
-		FQueue<unsigned int> indecesToVisit(128);
+		FQueue<unsigned int> indecesToVisit(1000);
 		std::vector<unsigned int> foundPoints;
 		foundPoints.reserve(16);
 		indecesToVisit.push_back(0);
-
+		unsigned int index;
+		bool intersection;
+		int dimension;
+		unsigned int numberOfIndecesToVisitThisDepth;
+		int maxNumberOfSonsToVisitNext;
+		int numberOfSonsToVisitNext;
+		unsigned int firstSonToVisitNext;
 		for (int depth = 0; depth < theDepth + 1; ++depth)
 		{
 
-			int dimension = depth % numberOfDimensions;
-			unsigned int numberOfIndecesToVisitThisDepth =
+			dimension = depth % numberOfDimensions;
+			numberOfIndecesToVisitThisDepth =
 					indecesToVisit.size();
 			for (unsigned int visitedIndecesThisDepth = 0;
 					visitedIndecesThisDepth < numberOfIndecesToVisitThisDepth;
@@ -176,12 +183,11 @@ public:
 			{
 
 
-				unsigned int index = indecesToVisit[visitedIndecesThisDepth];
-				bool intersection = intersects(index, minPoint, maxPoint,
+				index = indecesToVisit[visitedIndecesThisDepth];
+				intersection = intersects(index, minPoint, maxPoint,
 						dimension);
-				unsigned int firstSonToVisitNext = leftSonIndex(index);
-				int maxNumberOfSonsToVisitNext = (firstSonToVisitNext < theNumberOfPoints) + ((firstSonToVisitNext+1) < theNumberOfPoints);
-				int numberOfSonsToVisitNext;
+				firstSonToVisitNext = leftSonIndex(index);
+				maxNumberOfSonsToVisitNext = (firstSonToVisitNext < theNumberOfPoints) + ((firstSonToVisitNext+1) < theNumberOfPoints);
 
 				if (intersection)
 				{
@@ -211,7 +217,7 @@ public:
 			const FKDPoint<TYPE, numberOfDimensions>& minPoint,
 			const FKDPoint<TYPE, numberOfDimensions>& maxPoint) const
 	{
-		FQueue<unsigned int> indecesToVisit(128);
+		FQueue<unsigned int> indecesToVisit(1000);
 		std::vector<unsigned int> result;
 		result.reserve(16);
 		indecesToVisit.push_back(0);
@@ -296,6 +302,8 @@ public:
 		}
 
 	}
+
+
 	bool test_correct_build(unsigned int index = 0, int dimension = 0) const
 	{
 
@@ -465,7 +473,8 @@ private:
 	{
 		if (length == 1)
 			return 0;
-		unsigned int index = 1 << ((int) log2(length));
+		unsigned int index = 1 << (FLOOR_LOG2(length));
+//		unsigned int index = 1 << ((int) log2(length));
 
 		if ((index / 2) - 1 <= length - index)
 			return index - 1;
@@ -507,7 +516,7 @@ private:
 		return true;;
 	}
 
-	long int theNumberOfPoints;
+	unsigned int theNumberOfPoints;
 	int theDepth;
 	std::vector<FKDPoint<TYPE, numberOfDimensions> > thePoints;
 	std::array<std::vector<TYPE>, numberOfDimensions> theDimensions;
