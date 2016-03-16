@@ -213,8 +213,7 @@ int main(int argc, char* argv[])
 
 	}
 //needed by the vanilla algo
-	float4* cmssw_points;
-	cmssw_points = new float4[nPoints];
+	float4* cmssw_points = new float4[nPoints];
 	for (int j = 0; j < nPoints; j++)
 	{
 		cmssw_points[j].x = points[j][0];
@@ -869,7 +868,8 @@ int main(int argc, char* argv[])
 				<< " points found using Vanilla CMSSW KDTree\n******************************\n"
 				<< std::endl;
 
-		delete[] cmssw_points;
 	}
+	delete[] cmssw_points;
+
 	return 0;
 }
