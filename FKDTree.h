@@ -221,35 +221,42 @@ public:
 		std::vector<unsigned int> result;
 		result.reserve(16);
 		indecesToVisit.push_back(0);
-
+		int dimension;
+		unsigned int numberOfIndecesToVisitThisDepth;
+		unsigned int index;
+		bool intersection;
+		bool isLowerThanBoxMin;
+		int startSon;
+		int endSon;
+		unsigned int indexToAdd;
 		for (int depth = 0; depth < theDepth + 1; ++depth)
 		{
 
-			int dimension = depth % numberOfDimensions;
-			unsigned int numberOfIndecesToVisitThisDepth =
+			dimension = depth % numberOfDimensions;
+			numberOfIndecesToVisitThisDepth =
 					indecesToVisit.size();
 			for (unsigned int visitedIndecesThisDepth = 0;
 					visitedIndecesThisDepth < numberOfIndecesToVisitThisDepth;
 					visitedIndecesThisDepth++)
 			{
 
-				unsigned int index = indecesToVisit[visitedIndecesThisDepth];
-				bool intersection = intersects(index, minPoint, maxPoint,
+				index = indecesToVisit[visitedIndecesThisDepth];
+				intersection = intersects(index, minPoint, maxPoint,
 						dimension);
 
 				if (intersection && is_in_the_box(index, minPoint, maxPoint))
 					result.push_back(theIds[index]);
 
-				bool isLowerThanBoxMin = theDimensions[dimension][index]
+				isLowerThanBoxMin = theDimensions[dimension][index]
 						< minPoint[dimension];
 
-				int startSon = isLowerThanBoxMin; //left son = 0, right son =1
+				startSon = isLowerThanBoxMin; //left son = 0, right son =1
 
-				int endSon = isLowerThanBoxMin || intersection;
+				endSon = isLowerThanBoxMin || intersection;
 
 				for (int whichSon = startSon; whichSon < endSon + 1; ++whichSon)
 				{
-					unsigned int indexToAdd = leftSonIndex(index) + whichSon;
+					indexToAdd = leftSonIndex(index) + whichSon;
 
 					if (indexToAdd < theNumberOfPoints)
 					{
@@ -400,6 +407,8 @@ public:
 	{
 		return theIds;
 	}
+
+
 	void build()
 	{
 		//gather kdtree building
