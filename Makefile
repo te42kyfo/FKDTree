@@ -1,4 +1,4 @@
-CFLAGS= -std=c++11 -ftree-vectorize -march=native -ffast-math -Ofast -march=native -mtune=native
+CFLAGS= -std=c++11 -ftree-vectorize -march=native -ffast-math -Ofast -mtune=native -g
 LIBS = -ltbb
 
 CUDAOBJECT =

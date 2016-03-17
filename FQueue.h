@@ -97,7 +97,10 @@ public:
 	{
 		return theSize;
 	}
-	bool empty() const;
+	bool empty() const
+	{
+		return theSize == 0;
+	}
 	T & front()
 	{
 

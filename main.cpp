@@ -1,4 +1,3 @@
-
 #include <chrono>
 #include <sstream>
 #include <unistd.h>
@@ -46,8 +45,7 @@ static void show_usage(std::string name)
 			<< "\t-i \tNumber of iterations to run [default 1]\n"
 			<< "\t-s \tRun the sequential algo\n"
 			<< "\t-c \tRun the vanilla cmssw algo\n"
-			<< "\t-f \tRun FKDtree algo\n"
-			<< "\t-a \tRun all the algos\n"
+			<< "\t-f \tRun FKDtree algo\n" << "\t-a \tRun all the algos\n"
 			<< "\t-r \tRun FKDtree recursive search algo\n"
 
 			<< "\t-b \tRun branchless FKDtree algo\n"
@@ -619,7 +617,7 @@ int main(int argc, char* argv[])
 
 						auto foundPoints =kdtree.search_in_the_box(minPoints[i], maxPoints[i]);
 						if(!kdtree.test_correct_search(foundPoints, minPoints[i], maxPoints[i]))
-							exit(1);
+						exit(1);
 						partial_results[i] = foundPoints.size();
 
 					});
@@ -649,106 +647,106 @@ int main(int argc, char* argv[])
 					<< (end_searching - start_searching).seconds() * 1e3
 					<< "ms\n" << std::endl;
 		}
-		if(runBranchless)
+		if (runBranchless)
 		{
-		if (runTheTests)
-		{
+			if (runTheTests)
+			{
 
-			std::vector<unsigned int> partial_results(nPoints);
+				std::vector<unsigned int> partial_results(nPoints);
 
-			tbb::tick_count start_searching = tbb::tick_count::now();
+				tbb::tick_count start_searching = tbb::tick_count::now();
 //		for (int i = 0; i < nPoints; ++i)
 //			pointsFound+=kdtree.search_in_the_box(minPoints[i], maxPoints[i]).size();
 
-			tbb::parallel_for(0, nPoints, 1,
-					[&](int i)
-					{
-
-						std::vector<unsigned int> foundPoints= kdtree.search_in_the_box_branchless(minPoints[i], maxPoints[i]);
-						if(!kdtree.test_correct_search(foundPoints, minPoints[i], maxPoints[i]))
-							exit(1);
-						partial_results[i] = foundPoints.size();
-
-					});
-			tbb::tick_count end_searching = tbb::tick_count::now();
-			pointsFound = std::accumulate(partial_results.begin(),
-					partial_results.end(), 0);
-			std::cout << "searching points using branchless FKDTree took "
-					<< (end_searching - start_searching).seconds() * 1e3
-					<< "ms\n" << " found points: " << pointsFound
-					<< "\n******************************\n" << std::endl;
-		}
-		else
-		{
-			tbb::tick_count start_searching = tbb::tick_count::now();
-			for (unsigned int iteration = 0; iteration < numberOfIterations;
-					++iteration)
-			{
-				tbb::parallel_for(0, nPoints, 1, [&](int i)
-//				for (int i = 0; i < nPoints; ++i)
+				tbb::parallel_for(0, nPoints, 1,
+						[&](int i)
 						{
 
 							std::vector<unsigned int> foundPoints= kdtree.search_in_the_box_branchless(minPoints[i], maxPoints[i]);
+							if(!kdtree.test_correct_search(foundPoints, minPoints[i], maxPoints[i]))
+							exit(1);
+							partial_results[i] = foundPoints.size();
+
 						});
-//				}
+				tbb::tick_count end_searching = tbb::tick_count::now();
+				pointsFound = std::accumulate(partial_results.begin(),
+						partial_results.end(), 0);
+				std::cout << "searching points using branchless FKDTree took "
+						<< (end_searching - start_searching).seconds() * 1e3
+						<< "ms\n" << " found points: " << pointsFound
+						<< "\n******************************\n" << std::endl;
 			}
-			tbb::tick_count end_searching = tbb::tick_count::now();
-			std::cout << "searching points using branchless FKDTree took "
-					<< (end_searching - start_searching).seconds() * 1e3
-					<< "ms\n" << std::endl;
+			else
+			{
+				tbb::tick_count start_searching = tbb::tick_count::now();
+				for (unsigned int iteration = 0; iteration < numberOfIterations;
+						++iteration)
+				{
+					tbb::parallel_for(0, nPoints, 1, [&](int i)
+//				for (int i = 0; i < nPoints; ++i)
+							{
+
+								std::vector<unsigned int> foundPoints= kdtree.search_in_the_box_branchless(minPoints[i], maxPoints[i]);
+							});
+//				}
+				}
+				tbb::tick_count end_searching = tbb::tick_count::now();
+				std::cout << "searching points using branchless FKDTree took "
+						<< (end_searching - start_searching).seconds() * 1e3
+						<< "ms\n" << std::endl;
+			}
 		}
-	}
 
-		if(runRecursive)
+		if (runRecursive)
 		{
-		if (runTheTests)
-		{
+			if (runTheTests)
+			{
 
-			std::vector<unsigned int> partial_results(nPoints);
+				std::vector<unsigned int> partial_results(nPoints);
 
-			tbb::tick_count start_searching = tbb::tick_count::now();
+				tbb::tick_count start_searching = tbb::tick_count::now();
 //		for (int i = 0; i < nPoints; ++i)
 //			pointsFound+=kdtree.search_in_the_box(minPoints[i], maxPoints[i]).size();
 
-			tbb::parallel_for(0, nPoints, 1,
-					[&](int i)
-					{
-						std::vector<unsigned int> foundPoints;
-						kdtree.search_in_the_box_recursive(minPoints[i], maxPoints[i],foundPoints);
-						if(!kdtree.test_correct_search(foundPoints, minPoints[i], maxPoints[i]))
-							exit(1);
-						partial_results[i] = foundPoints.size();
-
-					});
-			tbb::tick_count end_searching = tbb::tick_count::now();
-			pointsFound = std::accumulate(partial_results.begin(),
-					partial_results.end(), 0);
-			std::cout << "searching points using recursive FKDTree took "
-					<< (end_searching - start_searching).seconds() * 1e3
-					<< "ms\n" << " found points: " << pointsFound
-					<< "\n******************************\n" << std::endl;
-		}
-		else
-		{
-			tbb::tick_count start_searching = tbb::tick_count::now();
-			for (unsigned int iteration = 0; iteration < numberOfIterations;
-					++iteration)
-			{
-				tbb::parallel_for(0, nPoints, 1, [&](int i)
-//				for (int i = 0; i < nPoints; ++i)
+				tbb::parallel_for(0, nPoints, 1,
+						[&](int i)
 						{
 							std::vector<unsigned int> foundPoints;
-
 							kdtree.search_in_the_box_recursive(minPoints[i], maxPoints[i],foundPoints);
+							if(!kdtree.test_correct_search(foundPoints, minPoints[i], maxPoints[i]))
+							exit(1);
+							partial_results[i] = foundPoints.size();
+
 						});
-//				}
+				tbb::tick_count end_searching = tbb::tick_count::now();
+				pointsFound = std::accumulate(partial_results.begin(),
+						partial_results.end(), 0);
+				std::cout << "searching points using recursive FKDTree took "
+						<< (end_searching - start_searching).seconds() * 1e3
+						<< "ms\n" << " found points: " << pointsFound
+						<< "\n******************************\n" << std::endl;
 			}
-			tbb::tick_count end_searching = tbb::tick_count::now();
-			std::cout << "searching points using recursive FKDTree took "
-					<< (end_searching - start_searching).seconds() * 1e3
-					<< "ms\n" << std::endl;
+			else
+			{
+				tbb::tick_count start_searching = tbb::tick_count::now();
+				for (unsigned int iteration = 0; iteration < numberOfIterations;
+						++iteration)
+				{
+					tbb::parallel_for(0, nPoints, 1, [&](int i)
+//				for (int i = 0; i < nPoints; ++i)
+							{
+								std::vector<unsigned int> foundPoints;
+
+								kdtree.search_in_the_box_recursive(minPoints[i], maxPoints[i],foundPoints);
+							});
+//				}
+				}
+				tbb::tick_count end_searching = tbb::tick_count::now();
+				std::cout << "searching points using recursive FKDTree took "
+						<< (end_searching - start_searching).seconds() * 1e3
+						<< "ms\n" << std::endl;
+			}
 		}
-	}
 
 	}
 
@@ -844,14 +842,18 @@ int main(int argc, char* argv[])
 		long int pointsFound = 0;
 		std::chrono::steady_clock::time_point start_searching =
 				std::chrono::steady_clock::now();
-		for (int i = 0; i < nPoints; ++i)
+		for (unsigned int iteration = 0; iteration < numberOfIterations;
+				++iteration)
 		{
-			KDTreeCube kd_searchcube(minPoints[i][0], maxPoints[i][0],
-					minPoints[i][1], maxPoints[i][1], minPoints[i][2],
-					maxPoints[i][2]);
-			vanilla_tree.search(kd_searchcube, vanilla_founds);
-			pointsFound += vanilla_founds.size();
-			vanilla_founds.clear();
+			for (int i = 0; i < nPoints; ++i)
+			{
+				KDTreeCube kd_searchcube(minPoints[i][0], maxPoints[i][0],
+						minPoints[i][1], maxPoints[i][1], minPoints[i][2],
+						maxPoints[i][2]);
+				vanilla_tree.search(kd_searchcube, vanilla_founds);
+				pointsFound += vanilla_founds.size();
+				vanilla_founds.clear();
+			}
 		}
 		std::chrono::steady_clock::time_point end_searching =
 				std::chrono::steady_clock::now();
