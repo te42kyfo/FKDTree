@@ -27,7 +27,7 @@ public:
 
 	FQueue(unsigned int initialCapacity)
 	{
-		theBuffer.resize(initialCapacity);
+//		theBuffer.resize(initialCapacity);
 		theSize = 0;
 		theFront = 0;
 		theTail = 0;
@@ -114,44 +114,36 @@ public:
 
 	void push_back(const T & value)
 	{
-//		bool willprint = false;
 
-		if (theSize >= theCapacity)
-		{
-//			std::cout << "pushing " << value << std::endl;
-//			print();
-//			willprint = true;
-			auto oldTail = theTail;
-			theBuffer.reserve(theCapacity + theTail);
-			if (theFront != 0)
-			{
-				for (int i = 0; i < theTail; ++i)
-				{
-					theBuffer.push_back(theBuffer[i]);
-				}
-				theCapacity += theTail;
+//		if (theSize >= theCapacity)
+//		{
+//			theBuffer.reserve(theCapacity + theTail);
+//			if (theFront != 0)
+//			{
+//				for (unsigned int i = 0; i < theTail; ++i)
+//				{
+//					theBuffer.push_back(theBuffer[i]);
+//				}
+//				theCapacity += theTail;
+//
+//				theTail = 0;
+//			}
+//			else
+//			{
+//
+//				theBuffer.resize(theCapacity + 16);
+//				theTail += theCapacity;
+//				theCapacity += 16;
+//
+//			}
+//
+//		}
 
-				theTail = 0;
-			}
-			else
-			{
-
-				theBuffer.resize(theCapacity + 16);
-				theTail += theCapacity;
-				theCapacity += 16;
-
-			}
-
-		}
-//		if(willprint)
-//			print();
 		theBuffer[theTail] = value;
 		theTail = (theTail + 1) % theCapacity;
 
 		theSize++;
 
-		if(theCapacity != theBuffer.size())
-				std::cout << "error " << theCapacity << " " <<theBuffer.size() << std::endl;
 
 	}
 
@@ -162,12 +154,17 @@ public:
 			std::cout << theBuffer[i] << " at position " << i << std::endl;
 
 	}
-	void pop_front()
+	T pop_front()
 	{
+
 		if (theSize > 0)
 		{
+			T element = theBuffer[theFront];
 			theFront = (theFront + 1) % theCapacity;
 			theSize--;
+
+
+			return element;
 		}
 	}
 
@@ -182,11 +179,11 @@ public:
 
 	void reserve(unsigned int capacity)
 	{
-		theBuffer.reserve(capacity);
+//		theBuffer.reserve(capacity);
 	}
 	void resize(unsigned int capacity)
 	{
-		theBuffer.resize(capacity);
+//		theBuffer.resize(capacity);
 
 	}
 
@@ -206,8 +203,8 @@ private:
 	unsigned int theSize;
 	unsigned int theFront;
 	unsigned int theTail;
-	std::vector<T> theBuffer;
-
+//	std::vector<T> theBuffer;
+	std::array<T, 1000> theBuffer;
 	unsigned int theCapacity;
 
 };

@@ -49,6 +49,7 @@ static void show_usage(std::string name)
 			<< "\t-r \tRun FKDtree recursive search algo\n"
 
 			<< "\t-b \tRun branchless FKDtree algo\n"
+			<< "\t-bfs \tRun branchless FKDtree BFS algo\n"
 
 			<< "\t-p <number of threads>\tSpecify the number of tbb parallel threads to use [default 1]\n"
 #ifdef __USE_OPENCL__
@@ -68,9 +69,9 @@ int main(int argc, char* argv[])
 		return 1;
 	}
 
-	int numberOfIterations = 1;
+	unsigned int numberOfIterations = 1;
 	int nPoints = 100000;
-	int numberOfThreads = 1;
+	unsigned int numberOfThreads = 1;
 	bool runTheTests = false;
 	bool runSequential = false;
 	bool runFKDTree = false;
@@ -79,7 +80,7 @@ int main(int argc, char* argv[])
 	bool runCuda = false;
 	bool runBranchless = false;
 	bool runRecursive = false;
-
+	bool runBFS = false;
 	for (int i = 1; i < argc; ++i)
 	{
 		std::string arg = argv[i];
@@ -139,16 +140,28 @@ int main(int argc, char* argv[])
 			runFKDTree = true;
 			runSequential = true;
 			runRecursive = true;
+			runBFS = true;
+			runBranchless = true;
+
+
 
 		}
 		else if (arg == "-b")
 		{
 			runBranchless = true;
+			runFKDTree = true;
+
+		}
+		else if (arg == "-bfs")
+		{
+			runFKDTree = true;
+			runBFS = true;
 
 		}
 		else if (arg == "-r")
 		{
 			runRecursive = true;
+			runFKDTree = true;
 
 		}
 #ifdef __USE_OPENCL__
@@ -612,7 +625,7 @@ int main(int argc, char* argv[])
 //			pointsFound+=kdtree.search_in_the_box(minPoints[i], maxPoints[i]).size();
 
 			tbb::parallel_for(0, nPoints, 1,
-					[&](int i)
+					[&](unsigned int i)
 					{
 
 						auto foundPoints =kdtree.search_in_the_box(minPoints[i], maxPoints[i]);
@@ -635,7 +648,7 @@ int main(int argc, char* argv[])
 			for (unsigned int iteration = 0; iteration < numberOfIterations;
 					++iteration)
 			{
-				tbb::parallel_for(0, nPoints, 1, [&](int i)
+				tbb::parallel_for(0, nPoints, 1, [&](unsigned int i)
 //				for (int i = 0; i < nPoints; ++i)
 						{
 							kdtree.search_in_the_box(minPoints[i], maxPoints[i]);
@@ -659,7 +672,7 @@ int main(int argc, char* argv[])
 //			pointsFound+=kdtree.search_in_the_box(minPoints[i], maxPoints[i]).size();
 
 				tbb::parallel_for(0, nPoints, 1,
-						[&](int i)
+						[&](unsigned int i)
 						{
 
 							std::vector<unsigned int> foundPoints= kdtree.search_in_the_box_branchless(minPoints[i], maxPoints[i]);
@@ -682,7 +695,7 @@ int main(int argc, char* argv[])
 				for (unsigned int iteration = 0; iteration < numberOfIterations;
 						++iteration)
 				{
-					tbb::parallel_for(0, nPoints, 1, [&](int i)
+					tbb::parallel_for(0, nPoints, 1, [&](unsigned int i)
 //				for (int i = 0; i < nPoints; ++i)
 							{
 
@@ -696,7 +709,55 @@ int main(int argc, char* argv[])
 						<< "ms\n" << std::endl;
 			}
 		}
+		if (runBFS)
+		{
+			if (runTheTests)
+			{
 
+				std::vector<unsigned int> partial_results(nPoints);
+
+				tbb::tick_count start_searching = tbb::tick_count::now();
+//		for (int i = 0; i < nPoints; ++i)
+//			pointsFound+=kdtree.search_in_the_box(minPoints[i], maxPoints[i]).size();
+
+				tbb::parallel_for(0, nPoints, 1,
+						[&](unsigned int i)
+						{
+
+							std::vector<unsigned int> foundPoints= kdtree.search_in_the_box_BFS(minPoints[i], maxPoints[i]);
+							if(!kdtree.test_correct_search(foundPoints, minPoints[i], maxPoints[i]))
+							exit(1);
+							partial_results[i] = foundPoints.size();
+
+						});
+				tbb::tick_count end_searching = tbb::tick_count::now();
+				pointsFound = std::accumulate(partial_results.begin(),
+						partial_results.end(), 0);
+				std::cout << "searching points using BFS FKDTree took "
+						<< (end_searching - start_searching).seconds() * 1e3
+						<< "ms\n" << " found points: " << pointsFound
+						<< "\n******************************\n" << std::endl;
+			}
+			else
+			{
+				tbb::tick_count start_searching = tbb::tick_count::now();
+				for (unsigned int iteration = 0; iteration < numberOfIterations;
+						++iteration)
+				{
+					tbb::parallel_for(0, nPoints, 1, [&](unsigned int i)
+//				for (int i = 0; i < nPoints; ++i)
+							{
+
+								std::vector<unsigned int> foundPoints= kdtree.search_in_the_box_BFS(minPoints[i], maxPoints[i]);
+							});
+//				}
+				}
+				tbb::tick_count end_searching = tbb::tick_count::now();
+				std::cout << "searching points using BFS FKDTree took "
+						<< (end_searching - start_searching).seconds() * 1e3
+						<< "ms\n" << std::endl;
+			}
+		}
 		if (runRecursive)
 		{
 			if (runTheTests)
@@ -709,7 +770,7 @@ int main(int argc, char* argv[])
 //			pointsFound+=kdtree.search_in_the_box(minPoints[i], maxPoints[i]).size();
 
 				tbb::parallel_for(0, nPoints, 1,
-						[&](int i)
+						[&](unsigned int i)
 						{
 							std::vector<unsigned int> foundPoints;
 							kdtree.search_in_the_box_recursive(minPoints[i], maxPoints[i],foundPoints);
@@ -732,7 +793,7 @@ int main(int argc, char* argv[])
 				for (unsigned int iteration = 0; iteration < numberOfIterations;
 						++iteration)
 				{
-					tbb::parallel_for(0, nPoints, 1, [&](int i)
+					tbb::parallel_for(0, nPoints, 1, [&](unsigned int i)
 //				for (int i = 0; i < nPoints; ++i)
 							{
 								std::vector<unsigned int> foundPoints;
@@ -758,8 +819,8 @@ int main(int argc, char* argv[])
 		std::this_thread::sleep_for(std::chrono::seconds(1));
 		std::chrono::steady_clock::time_point start_sequential =
 				std::chrono::steady_clock::now();
-		long int pointsFound = 0;
-		for (int i = 0; i < nPoints; ++i)
+		unsigned int pointsFound = 0;
+		for (unsigned int i = 0; i < nPoints; ++i)
 		{
 			for (auto p : points)
 			{
@@ -839,13 +900,13 @@ int main(int argc, char* argv[])
 		vanilla_tree.build(vanilla_nodes, cluster_bounds);
 		std::chrono::steady_clock::time_point end_building =
 				std::chrono::steady_clock::now();
-		long int pointsFound = 0;
+		unsigned int pointsFound = 0;
 		std::chrono::steady_clock::time_point start_searching =
 				std::chrono::steady_clock::now();
 		for (unsigned int iteration = 0; iteration < numberOfIterations;
 				++iteration)
 		{
-			for (int i = 0; i < nPoints; ++i)
+			for (unsigned int i = 0; i < nPoints; ++i)
 			{
 				KDTreeCube kd_searchcube(minPoints[i][0], maxPoints[i][0],
 						minPoints[i][1], maxPoints[i][1], minPoints[i][2],

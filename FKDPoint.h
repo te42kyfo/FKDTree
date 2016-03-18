@@ -21,7 +21,7 @@ public:
 	}
 
 	FKDPoint(const FKDPoint<TYPE, numberOfDimensions>& other) :
-			theId(other.theId), theElements(other.theElements)
+			theElements(other.theElements),theId(other.theId)
 	{
 
 	}
@@ -89,7 +89,7 @@ public:
 		return theId;
 	}
 
-	void print()
+	void print() const
 	{
 		std::cout << "point id: " << theId << std::endl;
 		for (auto i : theElements)
