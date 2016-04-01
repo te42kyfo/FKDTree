@@ -1,4 +1,4 @@
 #!/bin/bash
 
 
-./kdtree -n 100000 -c -f -r -b -bfs   & ./track_memory.sh $(pidof kdtree) 0.1
+./kdtree -n 100000 -c -b   & ./track_memory.sh $(pidof kdtree) 0.1
