@@ -161,7 +161,7 @@ public:
 			const FKDPoint<TYPE, numberOfDimensions>& minPoint,
 			const FKDPoint<TYPE, numberOfDimensions>& maxPoint)
 	{
-		FQueue<unsigned int> indecesToVisit(1000);
+		FQueue<unsigned int> indecesToVisit(100);
 		std::vector<unsigned int> foundPoints;
 		foundPoints.reserve(16);
 		indecesToVisit.push_back(0);
@@ -220,7 +220,7 @@ public:
 			const FKDPoint<TYPE, numberOfDimensions>& minPoint,
 			const FKDPoint<TYPE, numberOfDimensions>& maxPoint)
 	{
-		FQueue<unsigned int> indecesToVisit(1000);
+		FQueue<unsigned int> indecesToVisit(100);
 		std::vector<unsigned int> foundPoints;
 		foundPoints.reserve(16);
 		indecesToVisit.push_back(0);
@@ -276,7 +276,7 @@ public:
 			const FKDPoint<TYPE, numberOfDimensions>& minPoint,
 			const FKDPoint<TYPE, numberOfDimensions>& maxPoint) const
 	{
-		FQueue<unsigned int> indecesToVisit(1000);
+		FQueue<unsigned int> indecesToVisit(100);
 		std::vector<unsigned int> result;
 		result.reserve(16);
 		indecesToVisit.push_back(0);
