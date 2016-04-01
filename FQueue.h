@@ -27,7 +27,7 @@ public:
 
 	FQueue(unsigned int initialCapacity)
 	{
-//		theBuffer.resize(initialCapacity);
+		theBuffer.resize(initialCapacity);
 		theSize = 0;
 		theFront = 0;
 		theTail = 0;
@@ -63,7 +63,7 @@ public:
 
 		if (this != &other)
 		{
-//			theBuffer.clear();
+			theBuffer.clear();
 			theSize = other.theSize;
 			theFront = other.theFront;
 			theTail = other.theTail;
@@ -80,7 +80,7 @@ public:
 	{
 		if (this != &v)
 		{
-//			theBuffer.clear();
+			theBuffer.clear();
 			theSize = v.theSize;
 			theBuffer = v.theBuffer;
 			theFront = v.theFront;

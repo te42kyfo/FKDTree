@@ -598,7 +598,6 @@ private:
 	std::vector<unsigned int> theIntervalLength;
 	std::vector<unsigned int> theIntervalMin;
 	std::vector<unsigned int> theIds;
-
 };
 
 #endif /* FKDTREE_FKDTREE_H_ */
