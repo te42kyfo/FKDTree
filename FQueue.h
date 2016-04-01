@@ -16,9 +16,9 @@ class FQueue
 public:
 	FQueue()
 	{
+		theBuffer.resize(0);
 
 		theSize = 0;
-//		theBuffer(0);
 		theFront = 0;
 		theTail = 0;
 		theCapacity = 0;
@@ -204,7 +204,6 @@ private:
 	unsigned int theFront;
 	unsigned int theTail;
 	std::vector<T> theBuffer;
-//	std::array<T, 1000> theBuffer;
 	unsigned int theCapacity;
 
 };

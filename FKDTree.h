@@ -220,6 +220,8 @@ public:
 			const FKDPoint<TYPE, numberOfDimensions>& minPoint,
 			const FKDPoint<TYPE, numberOfDimensions>& maxPoint)
 	{
+
+		//the queue could become a data member in case we don't want to run this in parallel
 		FQueue<unsigned int> indecesToVisit(100);
 		std::vector<unsigned int> foundPoints;
 		foundPoints.reserve(16);

@@ -63,7 +63,7 @@ static void show_usage(std::string name)
 }
 int main(int argc, char* argv[])
 {
-	if (argc < 3)
+	if (argc < 2)
 	{
 		show_usage(argv[0]);
 		return 1;
