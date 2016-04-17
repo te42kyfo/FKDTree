@@ -9,6 +9,8 @@
 #define FKDTREE_QUEUE_H_
 
 #include <vector>
+#include <cassert>
+
 template<class T>
 
 class FQueue
@@ -16,7 +18,9 @@ class FQueue
 public:
 	FQueue()
 	{
+#ifdef USE_VECTOR
 		theBuffer.resize(0);
+#endif
 
 		theSize = 0;
 		theFront = 0;
@@ -27,7 +31,9 @@ public:
 
 	FQueue(unsigned int initialCapacity)
 	{
+#ifdef USE_VECTOR
 		theBuffer.resize(initialCapacity);
+#endif
 		theSize = 0;
 		theFront = 0;
 		theTail = 0;
@@ -47,7 +53,9 @@ public:
 	FQueue(FQueue<T> && other) :
 			theSize(0), theFront(0), theTail(0)
 	{
+#ifdef USE_VECTOR
 		theBuffer.clear();
+#endif
 		theCapacity = other.theCapacity;
 		theSize = other.theSize;
 		theFront = other.theFront;
@@ -63,7 +71,9 @@ public:
 
 		if (this != &other)
 		{
+#ifdef USE_VECTOR
 			theBuffer.clear();
+#endif
 			theSize = other.theSize;
 			theFront = other.theFront;
 			theTail = other.theTail;
@@ -80,7 +90,9 @@ public:
 	{
 		if (this != &v)
 		{
+#ifdef USE_VECTOR
 			theBuffer.clear();
+#endif
 			theSize = v.theSize;
 			theBuffer = v.theBuffer;
 			theFront = v.theFront;
@@ -112,9 +124,13 @@ public:
 		return theBuffer[theTail];
 	}
 
+  constexpr unsigned int wrapIndex(unsigned int i) {
+    return i & (theBuffer.size()-1);
+  }
+
 	void push_back(const T & value)
 	{
-
+#ifdef USE_VECTOR
 		if (theSize >= theCapacity)
 		{
 			theBuffer.reserve(theCapacity + theTail);
@@ -138,9 +154,10 @@ public:
 			}
 
 		}
-
+#endif
+                assert(theSize < theBuffer.size());
 		theBuffer[theTail] = value;
-		theTail = (theTail + 1) % theCapacity;
+		theTail = wrapIndex(theTail + 1);
 
 		theSize++;
 
@@ -160,7 +177,7 @@ public:
 		if (theSize > 0)
 		{
 			T element = theBuffer[theFront];
-			theFront = (theFront + 1) % theCapacity;
+			theFront = wrapIndex(theFront + 1);
 			theSize--;
 
 
@@ -174,27 +191,33 @@ public:
 				theSize > numberOfElementsToPop ?
 						numberOfElementsToPop : theSize;
 		theSize -= elementsToErase;
-		theFront = (theFront + elementsToErase) % theCapacity;
+		theFront = wrapIndex(theFront + elementsToErase);
 	}
 
 	void reserve(unsigned int capacity)
 	{
+#ifdef USE_VECTOR
 		theBuffer.reserve(capacity);
+#endif
 	}
 	void resize(unsigned int capacity)
 	{
+#ifdef USE_VECTOR
 		theBuffer.resize(capacity);
+#endif
 
 	}
 
 	T & operator[](unsigned int index)
 	{
-		return theBuffer[(theFront + index) % theCapacity];
+		return theBuffer[wrapIndex(theFront + index)];
 	}
 
 	void clear()
 	{
+#ifdef USE_VECTOR
 		theBuffer.clear();
+#endif
 		theSize = 0;
 		theFront = 0;
 		theTail = 0;
@@ -203,7 +226,10 @@ private:
 	unsigned int theSize;
 	unsigned int theFront;
 	unsigned int theTail;
+#ifdef USE_VECTOR
 	std::vector<T> theBuffer;
+#endif
+        std::array<T, 1024> theBuffer;
 	unsigned int theCapacity;
 
 };
