@@ -235,13 +235,11 @@ int main(int argc, char* argv[])
 	}
 
 	std::cout << "Cloud of points generated.\n" << std::endl;
-	std::this_thread::sleep_for(std::chrono::seconds(1));
 
 	if (runFKDTree)
 	{
 		std::atomic<unsigned int> pointsFound(0);
-		std::cout << "FKDTree run will start in 1 second.\n" << std::endl;
-		std::this_thread::sleep_for(std::chrono::seconds(1));
+
 
 		std::chrono::steady_clock::time_point start_building =
 				std::chrono::steady_clock::now();
@@ -816,7 +814,6 @@ int main(int argc, char* argv[])
 	if (runSequential)
 	{
 		std::cout << "Sequential run will start in 1 second.\n" << std::endl;
-		std::this_thread::sleep_for(std::chrono::seconds(1));
 		std::chrono::steady_clock::time_point start_sequential =
 				std::chrono::steady_clock::now();
 		unsigned int pointsFound = 0;
@@ -851,9 +848,8 @@ int main(int argc, char* argv[])
 	if (runOldKDTree)
 	{
 
-		std::cout << "Vanilla CMSSW KDTree run will start in 1 second.\n"
-				<< std::endl;
-		std::this_thread::sleep_for(std::chrono::seconds(1));
+
+
 		std::chrono::steady_clock::time_point start_building =
 				std::chrono::steady_clock::now();
 
