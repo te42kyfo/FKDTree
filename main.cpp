@@ -6,6 +6,7 @@
 #include <atomic>
 #include <string.h>
 #include <iostream>
+#include <random>
 #ifdef __USE_OPENCL__
 #include <fstream>
 #include <CL/cl.h>
@@ -205,17 +206,15 @@ int main(int argc, char* argv[])
 
 //	FKDPoint<float, 3> minPoint(0, 1, 8);
 //	FKDPoint<float, 3> maxPoint(0.4, 1.2, 8.3);
+
+    std::default_random_engine rd_gen;
+    std::uniform_real_distribution<float> udis(0.0f, 10.1f);
+
 	for (int i = 0; i < nPoints; ++i)
 	{
-		float x = static_cast<float>(rand())
-				/ (static_cast<float>(RAND_MAX / 10.1));
-
-		float y = static_cast<float>(rand())
-				/ (static_cast<float>(RAND_MAX / 10.1));
-
-		float z = static_cast<float>(rand())
-				/ (static_cast<float>(RAND_MAX / 10.1));
-
+        float x = udis(rd_gen);
+        float y = udis(rd_gen);
+        float z = udis(rd_gen);
 		points.push_back(make_FKDPoint(x, y, z, i));
 		FKDPoint<float, 3> m(x - range_x, y - range_y, z - range_z, 0);
 		minPoints.push_back(m);
@@ -813,7 +812,6 @@ int main(int argc, char* argv[])
 //
 	if (runSequential)
 	{
-		std::cout << "Sequential run will start in 1 second.\n" << std::endl;
 		std::chrono::steady_clock::time_point start_sequential =
 				std::chrono::steady_clock::now();
 		unsigned int pointsFound = 0;
