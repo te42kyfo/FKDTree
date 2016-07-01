@@ -13,10 +13,10 @@ class FKDTree {
       const FKDPoint<TYPE, numberOfDimensions>& minPoint,
       const FKDPoint<TYPE, numberOfDimensions>& maxPoint) const = 0;
 
-
   virtual void build() = 0;
   virtual std::vector<TYPE> const& getDimensionVector(
       const int dimension) const = 0;
+  virtual std::vector<unsigned int> const& getIdVector() const = 0;
 
   bool test_correct_build(unsigned int index = 0, int dimension = 0) const {
     unsigned int theNumberOfPoints = getDimensionVector(0).size();

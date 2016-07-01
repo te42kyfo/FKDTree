@@ -3,6 +3,7 @@
 #include <atomic>
 #include <chrono>
 #include <iostream>
+#include <memory>
 #include <random>
 #include <sstream>
 #include <thread>
@@ -11,6 +12,7 @@
 #include <CL/cl.h>
 #include <fstream>
 #include "cl_helper.h"
+#include "FKDTree_opencl.h"
 #endif
 
 #ifdef __USE_CUDA__
@@ -163,9 +165,9 @@ int main(int argc, char* argv[]) {
   }
   tbb::task_scheduler_init init(numberOfThreads);
 
-  std::vector<FKDPoint<float, 3> > points;
-  std::vector<FKDPoint<float, 3> > minPoints;
-  std::vector<FKDPoint<float, 3> > maxPoints;
+  std::vector<FKDPoint<float, 3>> points;
+  std::vector<FKDPoint<float, 3>> minPoints;
+  std::vector<FKDPoint<float, 3>> maxPoints;
 
   float range_x = 0.51;
   float range_y = 0.51;
@@ -222,250 +224,49 @@ int main(int argc, char* argv[]) {
 
 #ifdef __USE_OPENCL__
     if (runOpenCL) {
-      int g = 0;
-      cl_int error;
-      cl_uint num_platforms;
-      checkOclErrors(clGetPlatformIDs(0, NULL, &num_platforms));
-      cl_platform_id* platforms =
-          (cl_platform_id*)malloc(sizeof(cl_platform_id) * num_platforms);
-      checkOclErrors(clGetPlatformIDs(num_platforms, platforms, NULL));
-      for (cl_uint p = 0; p < 1; ++p) {
-        cl_platform_id platform = platforms[p];
-        char platform_name[256];
-        checkOclErrors(clGetPlatformInfo(platform, CL_PLATFORM_NAME,
-                                         sizeof(platform_name), platform_name,
-                                         NULL));
-        //		if (strcmp(platform_name, "NVIDIA CUDA")) continue;
-        cl_uint num_devices;
-        checkOclErrors(clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, 0, NULL,
-                                      &num_devices));
-        cl_device_id* devices =
-            (cl_device_id*)malloc(sizeof(cl_device_id) * num_devices);
-        checkOclErrors(clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, num_devices,
-                                      devices, NULL));
-        for (cl_uint d = 0; d < num_devices; ++d, ++g) {
-          cl_device_id device = devices[d];
-          char device_name[256];
-          checkOclErrors(clGetDeviceInfo(
-              device, CL_DEVICE_NAME, sizeof(device_name), device_name, NULL));
-          cl_context context =
-              clCreateContext(NULL, 1, &device, NULL, NULL, &error);
-          checkOclErrors(error);
+      std::unique_ptr<FKDTree<float, 3>> clKdtree(
+          static_cast<FKDTree<float, 3>*>(
+              new FKDTree_OpenCL<float, 3>(points)));
 
-          cl_mem d_dimensions_mem;
-          cl_mem h_dimensions_mem;
+      clKdtree->build();
 
-          void* d_dimensions;
-          void* h_dimensions;
+      if (runTheTests) {
+        std::vector<unsigned int> partial_results(nPoints);
 
-          void* d_ids = nullptr;
-          void* h_ids = nullptr;
-          cl_mem d_ids_mem;
-          cl_mem h_ids_mem;
+        tbb::tick_count start_searching = tbb::tick_count::now();
 
-          void* d_results;
-          void* h_results;
-          cl_mem d_results_mem;
-          cl_mem h_results_mem;
-
-          const size_t maxResultSize = 512;
-
-          // allocating device memory block
-          d_dimensions_mem =
-              clCreateBuffer(context, CL_MEM_READ_WRITE,
-                             3 * nPoints * sizeof(float), NULL, &error);
-          checkOclErrors(error);
-
-          // allocating host memory block
-          h_dimensions_mem = clCreateBuffer(
-              context, /*CL_MEM_READ_WRITE | */
-              CL_MEM_ALLOC_HOST_PTR, 3 * nPoints * sizeof(float), NULL, &error);
-          checkOclErrors(error);
-
-          h_dimensions = clEnqueueMapBuffer(command_queue, h_dimensions_mem,
-                                            CL_TRUE, CL_MAP_READ | CL_MAP_WRITE,
-                                            0, 3 * nPoints * sizeof(float), 0,
-                                            NULL, NULL, &error);
-          checkOclErrors(error);
-          d_dimensions = clEnqueueMapBuffer(command_queue, d_dimensions_mem,
-                                            CL_TRUE, CL_MAP_READ | CL_MAP_WRITE,
-                                            0, 3 * nPoints * sizeof(float), 0,
-                                            NULL, NULL, &error);
-          checkOclErrors(error);
-
-          d_ids_mem =
-              clCreateBuffer(context, CL_MEM_READ_WRITE,
-                             nPoints * sizeof(unsigned int), NULL, &error);
-          checkOclErrors(error);
-          h_ids_mem =
-              clCreateBuffer(context, /*CL_MEM_READ_WRITE | */
-                             CL_MEM_ALLOC_HOST_PTR,
-                             nPoints * sizeof(unsigned int), NULL, &error);
-          checkOclErrors(error);
-
-          h_ids = clEnqueueMapBuffer(
-              command_queue, h_ids_mem, CL_TRUE, CL_MAP_READ | CL_MAP_WRITE, 0,
-              nPoints * sizeof(unsigned int), 0, NULL, NULL, &error);
-          checkOclErrors(error);
-          d_ids = clEnqueueMapBuffer(
-              command_queue, d_ids_mem, CL_TRUE, CL_MAP_READ | CL_MAP_WRITE, 0,
-              nPoints * sizeof(unsigned int), 0, NULL, NULL, &error);
-          checkOclErrors(error);
-
-          d_results_mem = clCreateBuffer(
-              context, CL_MEM_READ_WRITE,
-              (nPoints + nPoints * maxResultSize) * sizeof(unsigned int), NULL,
-              &error);
-          checkOclErrors(error);
-          h_results_mem = clCreateBuffer(
-              context, /*CL_MEM_READ_WRITE | */
-              CL_MEM_ALLOC_HOST_PTR,
-              (nPoints + nPoints * maxResultSize) * sizeof(unsigned int), NULL,
-              &error);
-          checkOclErrors(error);
-
-          h_results = clEnqueueMapBuffer(
-              command_queue, h_results_mem, CL_TRUE, CL_MAP_READ | CL_MAP_WRITE,
-              0, (nPoints + nPoints * maxResultSize) * sizeof(unsigned int), 0,
-              NULL, NULL, &error);
-          checkOclErrors(error);
-          d_results = clEnqueueMapBuffer(
-              command_queue, d_results_mem, CL_TRUE, CL_MAP_READ | CL_MAP_WRITE,
-              0, (nPoints + nPoints * maxResultSize) * sizeof(unsigned int), 0,
-              NULL, NULL, &error);
-          checkOclErrors(error);
-
-          for (int dim = 0; dim < 3; dim++) {
-            float* dummy_dim = (float*)(h_dimensions);
-            memcpy(&dummy_dim[nPoints * dim],
-                   kdtree.getDimensionVector(dim).data(),
-                   nPoints * sizeof(float));
-          }
-          memcpy(d_dimensions, h_dimensions, 3 * nPoints * sizeof(float));
-          memcpy(h_ids, kdtree.getIdVector().data(),
-                 nPoints * sizeof(unsigned int));
-
-          memcpy(d_ids, h_ids, nPoints * sizeof(unsigned int));
-
-          // memcpy(h_results, d_results,nPoints * sizeof(unsigned int));
-
-          // unsigned int* risultati = (unsigned int*) h_results;
-          /*for (int i = 0; i < nPoints; ++i)
-           {
-           std::cout << risultati[i] << std::endl;
-
-           }*/
-
-          const size_t lws = 256;
-          const size_t gws = ceil(nPoints / (float)lws) * lws;
-          std::ifstream ifs("searchInTheBox.cl");
-          std::string source((std::istreambuf_iterator<char>(ifs)),
-                             std::istreambuf_iterator<char>());
-          const char* sources[] = {source.data()};
-          const size_t source_length = source.length();
-
-          cl_program program = clCreateProgramWithSource(
-              context, 1, sources, &source_length, &error);
-          checkOclErrors(error);
-
-          checkOclErrors(clBuildProgram(program, 0, NULL, NULL, NULL, NULL));
-          size_t len;
-          char* buffer;
-          clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, 0, NULL,
-                                &len);
-          buffer = (char*)calloc(len, sizeof(char));
-          clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, len,
-                                buffer, NULL);
-          printf("%s\n", buffer);
-          cl_kernel kernel =
-              clCreateKernel(program, "SearchInTheKDBox", &error);
-          checkOclErrors(error);
-
-          checkOclErrors(
-              clSetKernelArg(kernel, 0, sizeof(unsigned int), &nPoints));
-          checkOclErrors(
-              clSetKernelArg(kernel, 1, sizeof(cl_mem), &d_dimensions_mem));
-          checkOclErrors(clSetKernelArg(kernel, 2, sizeof(cl_mem), &d_ids_mem));
-          checkOclErrors(
-              clSetKernelArg(kernel, 3, sizeof(cl_mem), &d_results_mem));
-
-          cl_event kernel_event;
-
-          std::chrono::steady_clock::time_point start_search_opencl =
-              std::chrono::steady_clock::now();
-          for (unsigned int iteration = 0; iteration < numberOfIterations;
-               ++iteration) {
-            checkOclErrors(clEnqueueNDRangeKernel(command_queue, kernel, 1,
-                                                  NULL, &gws, &lws, 0, NULL,
-                                                  &kernel_event));
-
-            memcpy(h_results, d_results,
-                   (nPoints + nPoints * maxResultSize) * sizeof(unsigned int));
-          }
-          std::chrono::steady_clock::time_point end_search_opencl =
-              std::chrono::steady_clock::now();
-          std::cout << "research using opencl device " << platform_name << " "
-                    << device_name << " for " << nPoints << " points took "
-                    << std::chrono::duration_cast<std::chrono::milliseconds>(
-                           end_search_opencl - start_search_opencl)
-                           .count()
-                    << "ms" << std::endl;
-
-          unsigned int* result = (unsigned int*)h_results;
-          unsigned int totalNumberOfPointsFound = 0;
-          if (runTheTests) {
-            int totalNumberOfPointsFound = 0;
-            for (int p = 0; p < nPoints; p++) {
-              unsigned int length = result[p];
-              totalNumberOfPointsFound += length;
-              int firstIndex = nPoints + maxResultSize * p;
-            }
-
-            std::cout << "GPU using OpenCL found " << totalNumberOfPointsFound
-                      << " points." << std::endl;
-          }
-
-          checkOclErrors(clEnqueueUnmapMemObject(
-              command_queue, d_dimensions_mem, d_dimensions, 0, NULL, NULL));
-          checkOclErrors(error);
-          checkOclErrors(clEnqueueUnmapMemObject(
-              command_queue, h_dimensions_mem, h_dimensions, 0, NULL, NULL));
-          checkOclErrors(error);
-
-          checkOclErrors(clEnqueueUnmapMemObject(command_queue, d_ids_mem,
-                                                 d_ids, 0, NULL, NULL));
-          checkOclErrors(error);
-          checkOclErrors(clEnqueueUnmapMemObject(command_queue, h_ids_mem,
-                                                 h_ids, 0, NULL, NULL));
-          checkOclErrors(error);
-          checkOclErrors(clFinish(command_queue));
-
-          checkOclErrors(clEnqueueUnmapMemObject(command_queue, d_results_mem,
-                                                 d_results, 0, NULL, NULL));
-          checkOclErrors(error);
-          checkOclErrors(clEnqueueUnmapMemObject(command_queue, h_results_mem,
-                                                 h_results, 0, NULL, NULL));
-          checkOclErrors(error);
-          checkOclErrors(clFinish(command_queue));
-
-          // deallocate pinned h_b
-
-          checkOclErrors(clReleaseMemObject(d_dimensions_mem));
-          checkOclErrors(clReleaseMemObject(h_dimensions_mem));
-
-          checkOclErrors(clReleaseMemObject(h_ids_mem));
-          checkOclErrors(clReleaseMemObject(d_ids_mem));
-
-          checkOclErrors(clReleaseCommandQueue(command_queue));
-
-          checkOclErrors(clReleaseKernel(kernel));
-          checkOclErrors(clReleaseProgram(program));
-          checkOclErrors(clReleaseContext(context));
+        for (unsigned int i = 0; i < nPoints; i++) {
+          std::vector<unsigned int> foundPoints =
+              clKdtree->search_in_the_box(minPoints[i], maxPoints[i]);
+          if (!test_correct_search(points, foundPoints, minPoints[i],
+                                   maxPoints[i]))
+            exit(1);
+          partial_results[i] = foundPoints.size();
         }
-        free(devices);
+        tbb::tick_count end_searching = tbb::tick_count::now();
+        pointsFound =
+            std::accumulate(partial_results.begin(), partial_results.end(), 0);
+        std::cout << "searching points using OpenCL FKDTree took "
+                  << (end_searching - start_searching).seconds() * 1e3 << "ms\n"
+                  << " found points: " << pointsFound
+                  << "\n******************************\n"
+                  << std::endl;
+      } else {
+        tbb::tick_count start_searching = tbb::tick_count::now();
+        for (unsigned int iteration = 0; iteration < numberOfIterations;
+             ++iteration) {
+          for (unsigned int i = 0; i < nPoints; i++) {
+            std::vector<unsigned int> foundPoints =
+                clKdtree->search_in_the_box(minPoints[i], maxPoints[i]);
+          }
+        }
+        tbb::tick_count end_searching = tbb::tick_count::now();
+        std::cout << "searching points using OpenCL FKDTree took "
+                  << (end_searching - start_searching).seconds() * 1e3 << "ms\n"
+                  << std::endl;
       }
-      free(platforms);
     }
+
 #endif
 #ifdef __USE_CUDA__
     if (runCuda) {
@@ -652,7 +453,7 @@ int main(int argc, char* argv[]) {
           std::vector<unsigned int> foundPoints =
               kdtree.search_in_the_box_BFS(minPoints[i], maxPoints[i]);
           if (!test_correct_search(points, foundPoints, minPoints[i],
-                                          maxPoints[i]))
+                                   maxPoints[i]))
             exit(1);
           partial_results[i] = foundPoints.size();
 
@@ -700,7 +501,7 @@ int main(int argc, char* argv[]) {
           kdtree.search_in_the_box_recursive(minPoints[i], maxPoints[i],
                                              foundPoints);
           if (!test_correct_search(points, foundPoints, minPoints[i],
-                                          maxPoints[i]))
+                                   maxPoints[i]))
             exit(1);
           partial_results[i] = foundPoints.size();
 
@@ -771,8 +572,8 @@ int main(int argc, char* argv[]) {
         std::chrono::steady_clock::now();
 
     KDTreeLinkerAlgo<unsigned, 3> vanilla_tree;
-    std::vector<KDTreeNodeInfoT<unsigned, 3> > vanilla_nodes;
-    std::vector<KDTreeNodeInfoT<unsigned, 3> > vanilla_founds;
+    std::vector<KDTreeNodeInfoT<unsigned, 3>> vanilla_nodes;
+    std::vector<KDTreeNodeInfoT<unsigned, 3>> vanilla_founds;
 
     std::array<float, 3> minpos{{0.0f, 0.0f, 0.0f}}, maxpos{{0.0f, 0.0f, 0.0f}};
 

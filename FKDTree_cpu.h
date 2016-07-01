@@ -209,6 +209,9 @@ class FKDTree_CPU : public FKDTree<TYPE, numberOfDimensions> {
   std::vector<TYPE> const& getDimensionVector(const int dimension) const {
     if (dimension < numberOfDimensions) return theDimensions[dimension];
   }
+  std::vector<unsigned int> const& getIdVector() const {
+    return theIds;
+  }
 
   void build() {
     // gather kdtree building
