@@ -18,6 +18,12 @@ class FKDTree_OpenCL : public FKDTree<TYPE, numberOfDimensions> {
     return std::vector<unsigned int>();
   }
 
+  std::vector<std::vector<unsigned int>> search_in_the_box_multiple(
+      const std::vector<FKDPoint<TYPE, numberOfDimensions>>& minPoints,
+      const std::vector<FKDPoint<TYPE, numberOfDimensions>>& maxPoints) const {
+    return std::vector<std::vector<unsigned int>>();
+  }
+
   std::vector<TYPE> const& getDimensionVector(const int dimension) const {
     return h_dimensions_vec[dimension];
   }
@@ -26,6 +32,7 @@ class FKDTree_OpenCL : public FKDTree<TYPE, numberOfDimensions> {
   void build() {}
 
  private:
+  
   OCL ocl;
   cl_mem d_dimensions;
   cl_mem d_ids;

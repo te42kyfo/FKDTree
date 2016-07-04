@@ -209,8 +209,12 @@ class FKDTree_CPU : public FKDTree<TYPE, numberOfDimensions> {
   std::vector<TYPE> const& getDimensionVector(const int dimension) const {
     if (dimension < numberOfDimensions) return theDimensions[dimension];
   }
-  std::vector<unsigned int> const& getIdVector() const {
-    return theIds;
+  std::vector<unsigned int> const& getIdVector() const { return theIds; }
+
+  std::vector<std::vector<unsigned int>> search_in_the_box_multiple(
+      const std::vector<FKDPoint<TYPE, numberOfDimensions>>& minPoints,
+      const std::vector<FKDPoint<TYPE, numberOfDimensions>>& maxPoints) const {
+    return std::vector<std::vector<unsigned int>>();
   }
 
   void build() {
