@@ -2,6 +2,7 @@
 #define OCL_HPP
 
 #include <CL/opencl.h>
+#include "cl_helper.h"
 #include <fstream>
 #include <iostream>
 #include <memory>
