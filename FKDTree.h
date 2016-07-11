@@ -19,11 +19,10 @@ class FKDTree {
       const = 0;
 
   virtual void build() = 0;
-  virtual std::vector<TYPE> const& getDimensionVector(
-      const int dimension) const = 0;
-  virtual std::vector<unsigned int> const& getIdVector() const = 0;
+  virtual std::vector<TYPE> const& getDimensionVector(const int dimension) = 0;
+  virtual std::vector<unsigned int> const& getIdVector() = 0;
 
-  bool test_correct_build(unsigned int index = 0, int dimension = 0) const {
+  bool test_correct_build(unsigned int index = 0, int dimension = 0)  {
     unsigned int theNumberOfPoints = getDimensionVector(0).size();
     unsigned int leftSonIndexInArray = 2 * index + 1;
     unsigned int rightSonIndexInArray = leftSonIndexInArray + 1;

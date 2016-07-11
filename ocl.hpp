@@ -2,12 +2,12 @@
 #define OCL_HPP
 
 #include <CL/opencl.h>
-#include "cl_helper.h"
 #include <fstream>
 #include <iostream>
 #include <memory>
 #include <string>
 #include <vector>
+#include "cl_helper.h"
 
 std::string platformInfo(cl_platform_id id, cl_platform_info param_name) {
   size_t size;
@@ -69,7 +69,8 @@ class OCL {
     clReleaseContext(context);
   }
 
-  cl_kernel buildKernel(std::string filename, std::string kernel_name) {
+  cl_kernel buildKernel(std::string filename, std::string kernel_name,
+                        std::string additional_options="") {
     std::string source;
     try {
       std::ifstream t(filename.c_str());
@@ -88,7 +89,8 @@ class OCL {
     cl_program program =
         clCreateProgramWithSource(context, 1, &char_source, NULL, &error);
     checkOclErrors(error);
-    std::string options("-cl-single-precision-constant -cl-fast-relaxed-math");
+    std::string options("");
+    options.append(additional_options);
     clBuildProgram(program, 0, NULL, options.c_str(), NULL, NULL);
     cl_build_status build_status = CL_BUILD_SUCCESS;
     clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_STATUS,

@@ -11,8 +11,8 @@
 #ifdef __USE_OPENCL__
 #include <CL/cl.h>
 #include <fstream>
-#include "cl_helper.h"
 #include "FKDTree_opencl.h"
+#include "cl_helper.h"
 #endif
 
 #ifdef __USE_CUDA__
@@ -143,7 +143,6 @@ int main(int argc, char* argv[]) {
     }
 #ifdef __USE_OPENCL__
     else if (arg == "-ocl") {
-      runFKDTree = true;
       runOpenCL = true;
     }
 #endif
@@ -200,156 +199,159 @@ int main(int argc, char* argv[]) {
 
   std::cout << "Cloud of points generated.\n" << std::endl;
 
-  if (runFKDTree) {
-    std::atomic<unsigned int> pointsFound(0);
+  std::atomic<unsigned int> pointsFound(0);
 
-    std::chrono::steady_clock::time_point start_building =
-        std::chrono::steady_clock::now();
-    FKDTree_CPU<float, 3> kdtree(points);
+  std::chrono::steady_clock::time_point start_building =
+      std::chrono::steady_clock::now();
+  FKDTree_CPU<float, 3> kdtree(points);
 
-    kdtree.build();
-    std::chrono::steady_clock::time_point end_building =
-        std::chrono::steady_clock::now();
-    std::cout << "building FKDTree with " << nPoints << " points took "
-              << std::chrono::duration_cast<std::chrono::milliseconds>(
-                     end_building - start_building)
-                     .count()
-              << "ms" << std::endl;
-    if (runTheTests) {
-      if (kdtree.test_correct_build())
-        std::cout << "FKDTree built correctly" << std::endl;
-      else
-        std::cerr << "FKDTree wrong" << std::endl;
-    }
+  kdtree.build();
+  std::chrono::steady_clock::time_point end_building =
+      std::chrono::steady_clock::now();
+  std::cout << "building FKDTree with " << nPoints << " points took "
+            << std::chrono::duration_cast<std::chrono::milliseconds>(
+                   end_building - start_building)
+                   .count()
+            << "ms" << std::endl;
+  if (runTheTests) {
+    if (kdtree.test_correct_build())
+      std::cout << "FKDTree built correctly" << std::endl;
+    else
+      std::cout << "FKDTree wrong" << std::endl;
+  }
 
 #ifdef __USE_OPENCL__
-    if (runOpenCL) {
-      std::unique_ptr<FKDTree<float, 3>> clKdtree(
-          static_cast<FKDTree<float, 3>*>(
-              new FKDTree_OpenCL<float, 3>(points)));
+  if (runOpenCL) {
+    std::unique_ptr<FKDTree<float, 3>> clKdtree(
+        static_cast<FKDTree<float, 3>*>(new FKDTree_OpenCL<float, 3>(points)));
 
-      clKdtree->build();
+    clKdtree->build();
 
-      if (runTheTests) {
-        std::vector<unsigned int> partial_results(nPoints);
+    if (runTheTests) {
+      if (clKdtree->test_correct_build())
+        std::cout << "FKDTree built correctly" << std::endl;
+      else
+        std::cout << "FKDTree wrong" << std::endl;
 
-        tbb::tick_count start_searching = tbb::tick_count::now();
+      std::vector<unsigned int> partial_results(nPoints);
 
+      tbb::tick_count start_searching = tbb::tick_count::now();
+
+      /*for (unsigned int i = 0; i < nPoints; i++) {
+        std::vector<unsigned int> foundPoints =
+            clKdtree->search_in_the_box(minPoints[i], maxPoints[i]);
+        if (!test_correct_search(points, foundPoints, minPoints[i],
+                                 maxPoints[i]))
+          exit(1);
+        partial_results[i] = foundPoints.size();
+        }*/
+      tbb::tick_count end_searching = tbb::tick_count::now();
+      pointsFound =
+          std::accumulate(partial_results.begin(), partial_results.end(), 0);
+      std::cout << "searching points using OpenCL FKDTree took "
+                << (end_searching - start_searching).seconds() * 1e3 << "ms\n"
+                << " found points: " << pointsFound
+                << "\n******************************\n"
+                << std::endl;
+    } else {
+      tbb::tick_count start_searching = tbb::tick_count::now();
+      for (unsigned int iteration = 0; iteration < numberOfIterations;
+           ++iteration) {
         for (unsigned int i = 0; i < nPoints; i++) {
           std::vector<unsigned int> foundPoints =
               clKdtree->search_in_the_box(minPoints[i], maxPoints[i]);
-          if (!test_correct_search(points, foundPoints, minPoints[i],
-                                   maxPoints[i]))
-            exit(1);
-          partial_results[i] = foundPoints.size();
         }
-        tbb::tick_count end_searching = tbb::tick_count::now();
-        pointsFound =
-            std::accumulate(partial_results.begin(), partial_results.end(), 0);
-        std::cout << "searching points using OpenCL FKDTree took "
-                  << (end_searching - start_searching).seconds() * 1e3 << "ms\n"
-                  << " found points: " << pointsFound
-                  << "\n******************************\n"
-                  << std::endl;
-      } else {
-        tbb::tick_count start_searching = tbb::tick_count::now();
-        for (unsigned int iteration = 0; iteration < numberOfIterations;
-             ++iteration) {
-          for (unsigned int i = 0; i < nPoints; i++) {
-            std::vector<unsigned int> foundPoints =
-                clKdtree->search_in_the_box(minPoints[i], maxPoints[i]);
-          }
-        }
-        tbb::tick_count end_searching = tbb::tick_count::now();
-        std::cout << "searching points using OpenCL FKDTree took "
-                  << (end_searching - start_searching).seconds() * 1e3 << "ms\n"
-                  << std::endl;
       }
+      tbb::tick_count end_searching = tbb::tick_count::now();
+      std::cout << "searching points using OpenCL FKDTree took "
+                << (end_searching - start_searching).seconds() * 1e3 << "ms\n"
+                << std::endl;
     }
+  }
 
 #endif
 #ifdef __USE_CUDA__
-    if (runCuda) {
-      const size_t maxResultSize = 512;
+  if (runCuda) {
+    const size_t maxResultSize = 512;
 
-      unsigned int* host_ids;
-      float* host_dimensions;
-      unsigned int* host_results;
+    unsigned int* host_ids;
+    float* host_dimensions;
+    unsigned int* host_results;
 
-      // host allocations
-      host_ids = (unsigned int*)malloc(nPoints * sizeof(unsigned int));
-      host_dimensions = (float*)malloc(3 * nPoints * sizeof(float));
-      host_results = (unsigned int*)malloc((nPoints + nPoints * maxResultSize) *
-                                           sizeof(unsigned int));
+    // host allocations
+    host_ids = (unsigned int*)malloc(nPoints * sizeof(unsigned int));
+    host_dimensions = (float*)malloc(3 * nPoints * sizeof(float));
+    host_results = (unsigned int*)malloc((nPoints + nPoints * maxResultSize) *
+                                         sizeof(unsigned int));
 
-      // initialise ids
-      memcpy(host_ids, kdtree.getIdVector().data(),
-             nPoints * sizeof(unsigned int));
+    // initialise ids
+    memcpy(host_ids, kdtree.getIdVector().data(),
+           nPoints * sizeof(unsigned int));
 
-      // initialise dimensions
-      for (int dim = 0; dim < 3; dim++) {
-        memcpy(&host_dimensions[nPoints * dim],
-               kdtree.getDimensionVector(dim).data(), nPoints * sizeof(float));
-      }
-
-      // Device vectors
-      float* d_dim = 0;
-      unsigned int* d_ids;
-      unsigned int* d_results;
-
-      // Allocate device memory
-      cudaMalloc(&d_dim, 3 * nPoints * sizeof(float));
-      cudaMalloc(&d_ids, nPoints * sizeof(unsigned int));
-      cudaMalloc(&d_results,
-                 (nPoints + nPoints * maxResultSize) * sizeof(unsigned int));
-
-      // Copy host vectors to device
-      cudaMemcpy(d_dim, host_dimensions, 3 * nPoints * sizeof(float),
-                 cudaMemcpyHostToDevice);
-      cudaMemcpy(d_ids, host_ids, nPoints * sizeof(unsigned int),
-                 cudaMemcpyHostToDevice);
-      // cudaMemcpy( d_results, host_results, (nPoints + nPoints *
-      // maxResultSize)* sizeof(unsigned int), cudaMemcpyHostToDevice);
-
-      tbb::tick_count start_searching_CUDA = tbb::tick_count::now();
-
-      CUDAKernelWrapper(nPoints, d_dim, d_ids, d_results);
-      cudaStreamSynchronize(0);
-      tbb::tick_count end_searching_CUDA = tbb::tick_count::now();
-
-      // Back to host
-      cudaMemcpy(host_results, d_results,
-                 (nPoints + nPoints * maxResultSize) * sizeof(unsigned int),
-                 cudaMemcpyDeviceToHost);
-
-      // Release device memory
-      cudaFree(d_dim);
-      cudaFree(d_ids);
-      cudaFree(d_results);
-
-      if (runTheTests) {
-        int totalNumberOfPointsFound = 0;
-        for (int p = 0; p < nPoints; p++) {
-          unsigned int length = host_results[p];
-          totalNumberOfPointsFound += length;
-          int firstIndex = nPoints + maxResultSize * p;
-        }
-
-        std::cout << "GPU using CUDA found " << totalNumberOfPointsFound
-                  << " points." << std::endl;
-      }
-
-      std::cout << "searching points using CUDA took "
-                << (end_searching_CUDA - start_searching_CUDA).seconds() * 1e3
-                << "ms\n"
-                << std::endl;
-
-      free(host_ids);
-      free(host_dimensions);
-      free(host_results);
+    // initialise dimensions
+    for (int dim = 0; dim < 3; dim++) {
+      memcpy(&host_dimensions[nPoints * dim],
+             kdtree.getDimensionVector(dim).data(), nPoints * sizeof(float));
     }
-#endif
 
+    // Device vectors
+    float* d_dim = 0;
+    unsigned int* d_ids;
+    unsigned int* d_results;
+
+    // Allocate device memory
+    cudaMalloc(&d_dim, 3 * nPoints * sizeof(float));
+    cudaMalloc(&d_ids, nPoints * sizeof(unsigned int));
+    cudaMalloc(&d_results,
+               (nPoints + nPoints * maxResultSize) * sizeof(unsigned int));
+
+    // Copy host vectors to device
+    cudaMemcpy(d_dim, host_dimensions, 3 * nPoints * sizeof(float),
+               cudaMemcpyHostToDevice);
+    cudaMemcpy(d_ids, host_ids, nPoints * sizeof(unsigned int),
+               cudaMemcpyHostToDevice);
+    // cudaMemcpy( d_results, host_results, (nPoints + nPoints *
+    // maxResultSize)* sizeof(unsigned int), cudaMemcpyHostToDevice);
+
+    tbb::tick_count start_searching_CUDA = tbb::tick_count::now();
+
+    CUDAKernelWrapper(nPoints, d_dim, d_ids, d_results);
+    cudaStreamSynchronize(0);
+    tbb::tick_count end_searching_CUDA = tbb::tick_count::now();
+
+    // Back to host
+    cudaMemcpy(host_results, d_results,
+               (nPoints + nPoints * maxResultSize) * sizeof(unsigned int),
+               cudaMemcpyDeviceToHost);
+
+    // Release device memory
+    cudaFree(d_dim);
+    cudaFree(d_ids);
+    cudaFree(d_results);
+
+    if (runTheTests) {
+      int totalNumberOfPointsFound = 0;
+      for (int p = 0; p < nPoints; p++) {
+        unsigned int length = host_results[p];
+        totalNumberOfPointsFound += length;
+        int firstIndex = nPoints + maxResultSize * p;
+      }
+
+      std::cout << "GPU using CUDA found " << totalNumberOfPointsFound
+                << " points." << std::endl;
+    }
+
+    std::cout << "searching points using CUDA took "
+              << (end_searching_CUDA - start_searching_CUDA).seconds() * 1e3
+              << "ms\n"
+              << std::endl;
+
+    free(host_ids);
+    free(host_dimensions);
+    free(host_results);
+  }
+#endif
+  if (runFKDTree) {
     if (runTheTests) {
       std::vector<unsigned int> partial_results(nPoints);
 

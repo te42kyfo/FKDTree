@@ -1,4 +1,4 @@
-CFLAGS= -std=c++11 -ftree-vectorize -march=native -ffast-math -Ofast -mtune=native -g
+CFLAGS= -std=c++11 -march=native -Wall -O3  -g
 LIBS = -ltbb
 
 CUDAOBJECT =
@@ -44,11 +44,14 @@ all: kdtree
 searchInTheBoxCuda.o: searchInTheBoxCuda.cu
 	$(NVCC) $(CUDAHEADERS) $(CUDAFLAGS) -c -Xcompiler $(CUDACFLAGS) searchInTheBoxCuda.cu
 
-kdtree: $(CUDAOBJECT) main.cpp FKDTree.h  FQueue.h
+kdtree: $(CUDAOBJECT) main.cpp FKDTree.h  FKDTree_cpu.h FKDTree_opencl.h FQueue.h
 	$(CC) main.cpp $(CFLAGS) $(CUDAFLAGS) $(OPENCLFLAGS) -o kdtree $(CUDAHEADERS) $(CUDALIBS) $(LIBS) $(OPENCLLIBS) $(CUDAOBJECT)
 
+test: test.cpp FKDTree.h  FKDTree_cpu.h FKDTree_opencl.h FQueue.h
+	$(CC) test.cpp $(CFLAGS) $(CUDAFLAGS) $(OPENCLFLAGS) -o $@ $(CUDAHEADERS) $(CUDALIBS) $(LIBS) $(OPENCLLIBS) $(CUDAOBJECT)
+
 clean:
-	rm -rf *.o kdtree
+	rm -rf *.o kdtree test perf
 
 
 
