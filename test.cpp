@@ -57,25 +57,28 @@ int main(int argc, char** argv) {
   }
 */
   OCL ocl(1);
-  cl_kernel nth_element_kernel =
-      ocl.buildKernel("nth_element.cl", "nth_element", "-D T=uint -D numberOfDimensions=3");
+  cl_kernel nth_element_kernel = ocl.buildKernel(
+      "nth_element.cl", "nth_element", "-D T=uint -D numberOfDimensions=3");
   unsigned int blockSize = 512;
-  for (cl_uint len = 8; len < (1u << 26); len *= 2) {
+  for (cl_uint len = 8; len < (1u << 20); len *= 2) {
     cl_int error;
     vector<unsigned int> host_data(len * 4);
 
     random_device rd;
     default_random_engine eng(rd());
-    uniform_int_distribution<unsigned int> dis;
+    uniform_int_distribution<unsigned int> dis(0, 1000);
 
     for (unsigned int i = 0; i < len * 3; i++) {
       host_data[i] = dis(eng);
-      //      if (len < 128) cout << host_data[i] << " ";
+      if (len < 32) cout << host_data[i] << " ";
     }
     for (unsigned int i = 0; i < len; i++) {
       host_data[3 * len + i] = i;
     }
-    //    cout << "\n";
+    cout << "\n";
+
+    vector<uint> groupStarts = {0, len / 2};
+    vector<uint> groupLens = {len / 2, len / 2};
 
     cl_mem d_dimensions_src = ocl.createAndUpload(host_data);
     cl_mem d_dimensions_dst =
@@ -85,15 +88,30 @@ int main(int argc, char** argv) {
                                 len * sizeof(unsigned int), NULL, &error);
     cl_mem d_B = clCreateBuffer(ocl.context, CL_MEM_READ_WRITE,
                                 len * sizeof(unsigned int), NULL, &error);
-    cl_mem d_temp =
-        clCreateBuffer(ocl.context, CL_MEM_READ_WRITE,
-                       blockSize * 16 * sizeof(unsigned int), NULL, &error);
+    cl_mem d_temp = clCreateBuffer(
+        ocl.context, CL_MEM_READ_WRITE,
+        groupStarts.size() * blockSize * 16 * sizeof(unsigned int), NULL,
+        &error);
 
     double t1 = dtime();
 
-    uint N = len / 2;
-    ocl.execute(nth_element_kernel, 1, {blockSize}, {blockSize},
-                d_dimensions_src, d_dimensions_dst, d_A, d_B, d_temp, len, N);
+    groupStarts = {0};
+    groupLens = {len};
+    cl_mem d_groupStarts = ocl.createAndUpload(groupStarts);
+    cl_mem d_groupLens = ocl.createAndUpload(groupLens);
+    ocl.execute(nth_element_kernel, 1, {groupStarts.size() * blockSize},
+                {blockSize}, d_groupStarts, d_groupLens, 1, d_dimensions_src,
+                d_dimensions_dst, d_A, d_B, d_temp, 0, len);
+
+    swap(d_dimensions_src, d_dimensions_dst);
+    groupStarts = {0, len / 2};
+    groupLens = {len / 2, len - len / 2};
+    d_groupStarts = ocl.createAndUpload(groupStarts);
+    d_groupLens = ocl.createAndUpload(groupLens);
+    ocl.execute(nth_element_kernel, 1, {groupStarts.size() * blockSize},
+                {blockSize}, d_groupStarts, d_groupLens, 2, d_dimensions_src,
+                d_dimensions_dst, d_A, d_B, d_temp, 1, len);
+
     ocl.finish();
     double t2 = dtime();
     auto results = ocl.download<unsigned int>(d_dimensions_dst);
@@ -104,18 +122,11 @@ int main(int argc, char** argv) {
     clReleaseMemObject(d_temp);
     std::cout << len << " " << t2 - t1 << "\n";
 
-    for (uint i = 0; i < N; i++) {
-      if (results[i] > results[N]) {
-        cout << i << " " << results[i] << " > " << results[N] << "\n";
-        break;
-      }
+    for (uint i = 0; i < len * 4; i++) {
+      if (len < 32) cout << results[i] << " ";
     }
-    for (uint i = N; i < len; i++) {
-      if (results[i] < results[N]) {
-        cout << i << " " << results[i] << " < " << results[N] << "\n";
-        break;
-      }
-    }
+    if (len < 32) cout << "\n";
+
   }
   return 0;
 }

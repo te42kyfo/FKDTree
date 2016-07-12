@@ -1,18 +1,31 @@
 // Template parameters: T, numberOfDimensions
 
-__kernel void nth_element(__global T* data_src, __global T* data_dst,
-                          __global T* A, __global T* B, __global uint* hist,
-                          uint totalLen, uint N) {
-  uint const tidx = get_global_id(0);
-  uint gridSize = get_global_size(0);
-
-// if (tidx == 0) printf("N=%u\n", N);
-
+__kernel void nth_element(__global uint* groupStarts, __global uint* groupLens,
+                          uint groupCount, __global T* global_dimensions_src,
+                          __global T* global_dimensions_dst,
+                          __global T* global_A, __global T* global_B,
+                          __global uint* global_hist, uint dimension,
+                          uint totalLen) {
 #define BUCKETCOUNT 16
 
-  __global T* src = data_src;
+  uint const tidx = get_local_id(0);
+  uint gridSize = get_local_size(0);
+  uint gid = get_group_id(0);
+
+  uint N = groupLens[gid] / 2;
+  uint groupLen = groupLens[gid];
+  __global T* dimensions_src =
+      global_dimensions_src + dimension * totalLen + groupStarts[gid];
+  __global T* dimensions_dst =
+      global_dimensions_dst + dimension * totalLen + groupStarts[gid];
+  __global T* A = global_A + groupStarts[gid];
+  __global T* B = global_B + groupStarts[gid];
+  __global uint* hist = global_hist + gid * BUCKETCOUNT * gridSize;
+
+  __global T* src = dimensions_src;
   __global T* dst = A;
-  uint len = totalLen;
+
+  uint len = groupLen;
   uint local_histogram[BUCKETCOUNT];
   for (int bucket = 0; bucket < sizeof(T) * 8 / 4; bucket++) {
     if (len == 1) break;
@@ -79,7 +92,7 @@ __kernel void nth_element(__global T* data_src, __global T* data_dst,
     __global T* temp = src;
     src = dst;
     dst = temp;
-    if (dst == data_src) dst = B;
+    if (dst == dimensions_src) dst = B;
 
     if (selectedBucket == 15) {
       len -= hist[selectedBucket * gridSize];
@@ -102,9 +115,9 @@ __kernel void nth_element(__global T* data_src, __global T* data_dst,
   buckets[1] = 0;
   buckets[2] = 0;
 
-  for (uint row = tidx; row < totalLen; row += gridSize) {
-    uint key = (data_src[row] > nth_element_value) ? 2 : 0;
-    key = (data_src[row] == nth_element_value) ? 1 : key;
+  for (uint row = tidx; row < groupLen; row += gridSize) {
+    uint key = (dimensions_src[row] > nth_element_value) ? 2 : 0;
+    key = (dimensions_src[row] == nth_element_value) ? 1 : key;
     buckets[key]++;
   }
 
@@ -131,11 +144,12 @@ __kernel void nth_element(__global T* data_src, __global T* data_dst,
   buckets[1] = hist[tidx + gridSize];
   buckets[2] = hist[tidx + 2 * gridSize];
 
-  for (uint row = tidx; row < totalLen; row += gridSize) {
-    uint key = (data_src[row] > nth_element_value) ? 2 : 0;
-    key = (data_src[row] == nth_element_value) ? 1 : key;
-    for (uint d = 0; d < numberOfDimensions; d++) {
-      data_dst[d * totalLen + buckets[key]] = data_src[d * totalLen + row];
+  for (uint row = tidx; row < groupLen; row += gridSize) {
+    uint key = (dimensions_src[row] > nth_element_value) ? 2 : 0;
+    key = (dimensions_src[row] == nth_element_value) ? 1 : key;
+    for (uint d = 0; d < numberOfDimensions + 1; d++) {
+      global_dimensions_dst[groupStarts[gid] + d * totalLen + buckets[key]] =
+          global_dimensions_src[groupStarts[gid] + d * totalLen + row];
     }
     buckets[key]++;
   }
