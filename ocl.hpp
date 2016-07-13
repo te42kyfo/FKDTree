@@ -49,6 +49,7 @@ class OCL {
 
     if (selection >= options.size()) selection = 0;
     for (unsigned int i = 0; i < options.size(); i++) {
+      std::cout << "# ";
       if (i == selection)
         std::cout << " * ";
       else
@@ -70,7 +71,7 @@ class OCL {
   }
 
   cl_kernel buildKernel(std::string filename, std::string kernel_name,
-                        std::string additional_options="") {
+                        std::string additional_options = "") {
     std::string source;
     try {
       std::ifstream t(filename.c_str());
@@ -161,10 +162,10 @@ class OCL {
     if (err != CL_SUCCESS) {
       std::cerr << "Argument index " << argument_index << "\n";
       checkOclErrors(err);
+    } else {
+      execute_t(argument_index + 1, kernel, dim, global_size, local_size,
+                args...);
     }
-
-    execute_t(argument_index + 1, kernel, dim, global_size, local_size,
-              args...);
   }
 
  public:
