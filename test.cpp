@@ -53,11 +53,14 @@ int main(int argc, char** argv) {
   OCL ocl(0);
   cl_kernel nth_element_kernel = ocl.buildKernel(
       "nth_element.cl", "nth_element", "-D T=uint -D numberOfDimensions=3");
+  cl_kernel nth_element_kernel_small =
+      ocl.buildKernel("nth_element.cl", "nth_element_small",
+                      "-D T=uint -D numberOfDimensions=3");
   unsigned int blockCount = 100;
   std::cout << "# BlockCount: " << blockCount << "\n";
   std::cout << "# Size: " << (1u << 18) << "\n";
   std::cout << "depth blocksize time\n";
-  for (uint blockSize = 1; blockSize <= 256; blockSize *= 2) {
+  for (uint blockSize = 8; blockSize <= 128; blockSize *= 2) {
     for (cl_uint len = (1u << 18); len < (1u << 19); len *= 2) {
       cl_int error;
       vector<unsigned int> host_data(len * 4);
@@ -107,10 +110,17 @@ int main(int argc, char** argv) {
       double lastDepth = t1;
       uint maximum_depth = ((unsigned int)(31 - __builtin_clz(len | 1)));
       for (uint depth = 0; depth < maximum_depth; depth++) {
-        ocl.execute(nth_element_kernel, 1, {blockSize * blockCount},
-                    {blockSize}, d_groupStarts, d_groupLens, (1 << depth),
-                    d_dimensions, d_points_src, d_points_dst, d_A, d_B, d_temp,
-                    depth % 3, len, depth);
+        if (depth < 12) {
+          ocl.execute(nth_element_kernel, 1, {blockSize * blockCount},
+                      {blockSize}, d_groupStarts, d_groupLens, (1 << depth),
+                      d_dimensions, d_points_src, d_points_dst, d_A, d_B,
+                      d_temp, depth % 3, len, depth);
+        } else {
+          ocl.execute(nth_element_kernel_small, 1, {blockSize * blockCount},
+                      {blockSize}, d_groupStarts, d_groupLens, (1 << depth),
+                      d_dimensions, d_points_src, d_points_dst, d_A, d_B,
+                      d_temp, depth % 3, len, depth);
+        }
         swap(d_points_src, d_points_dst);
         ocl.finish();
         double thisDepth = dtime();
@@ -120,6 +130,7 @@ int main(int argc, char** argv) {
       }
 
       double t2 = dtime();
+
       auto results = ocl.download<unsigned int>(d_dimensions);
       clReleaseMemObject(d_A);
       clReleaseMemObject(d_B);
@@ -129,7 +140,7 @@ int main(int argc, char** argv) {
       clReleaseMemObject(d_temp);
       clReleaseMemObject(d_groupStarts);
       clReleaseMemObject(d_groupLens);
-      //      std::cout << len << " " << t2 - t1 << "\n";
+      std::cout << len << " " << t2 - t1 << "\n";
 
       if (len < 32) {
         for (uint i = 0; i < len * 4; i++) {
@@ -137,12 +148,12 @@ int main(int argc, char** argv) {
           if (i % len == len - 1) cout << "\n";
         }
       }
-      /*      if (test_correct_build(results, 0, 0, len, 3)) {
+      if (test_correct_build(results, 0, 0, len, 3)) {
         cout << "Correct Build\n";
       } else {
         cout << "Wrong Build\n";
       }
-      cout << "\n";*/
+      cout << "\n";
     }
   }
   return 0;
