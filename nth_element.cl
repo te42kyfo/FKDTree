@@ -2,6 +2,7 @@
 
 #define FLOOR_LOG2(X) ((unsigned int)(31 - clz(X | 1)))
 
+// calculates the split position to have a complete tree on the left
 uint partition_complete_kdtree(uint len) {
   if (len == 1) return 0;
   uint index = 1 << (FLOOR_LOG2(len));
@@ -12,6 +13,8 @@ uint partition_complete_kdtree(uint len) {
     return len - index / 2;
 }
 
+// small partition size kernel. One thread per partition, uses bubblesort
+// to find the parition value.
 __kernel void nth_element_small(
     __global uint* groupStarts, __global uint* groupLens, uint groupCount,
     __global T* dimensions, __global T* global_points_src,
@@ -20,6 +23,7 @@ __kernel void nth_element_small(
   uint const tidx = get_global_id(0);
   uint const gridSize = get_global_size(0);
 
+  // Grid stride loop over partitions
   for (uint gidx = tidx; gidx < groupCount; gidx += gridSize) {
     uint gindex = (1 << depth) - 1 + gidx;
     uint groupLen = groupLens[gindex];
@@ -27,6 +31,7 @@ __kernel void nth_element_small(
     uint group_N = partition_complete_kdtree(groupLen);
 
     uint nth_element_value;
+    // optimized cases for lengths 1 and 2
     if (groupLen == 1) {
       nth_element_value = global_points_src[groupStart];
     }
@@ -39,6 +44,7 @@ __kernel void nth_element_small(
       nth_element_value = temp[group_N];
     }
     if (groupLen > 2) {
+      // simple bubblesort
       for (uint i = 0; i < groupLen; i++) {
         for (uint j = 0; j < groupLen - 1 - i; j++) {
           if (global_points_src[groupStart + j] >
@@ -53,6 +59,7 @@ __kernel void nth_element_small(
       }
     }
 
+    // count values below, equal, above nth_element_value
     uint buckets[3];
 
     buckets[0] = 0;
@@ -70,6 +77,7 @@ __kernel void nth_element_small(
     buckets[1] = buckets[0];
     buckets[0] = 0;
 
+    // rearange values from points_src to the right partitions in points_dst
     for (uint row = 0; row < groupLen; row++) {
       uint key =
           (global_points_src[groupStart + row] > nth_element_value) ? 2 : 0;
@@ -87,6 +95,7 @@ __kernel void nth_element_small(
     uint leftChildIndex = (1 << (depth + 1)) - 1 + 2 * gidx;
     uint rightChildIndex = (1 << (depth + 1)) - 1 + 2 * gidx + 1;
 
+    // write new groupStarts/groupLens for the next depth
     if (leftChildIndex < totalLen) {
       groupStarts[leftChildIndex] = groupStart;
       groupLens[leftChildIndex] = group_N;
@@ -106,17 +115,20 @@ __kernel void nth_element_small(
   }
 }
 
+// partition kernel for the earlier depth stages. One work group per partition
 __kernel void nth_element(__global uint* groupStarts, __global uint* groupLens,
                           uint groupCount, __global T* dimensions,
                           __global T* global_points_src,
                           __global T* global_points_dst, __global T* global_A,
                           __global T* global_B, __global uint* global_hist,
                           uint dimension, uint totalLen, uint depth) {
+// Radixsort with 4 bits/16 buckets
 #define BUCKETCOUNT 16
 
   uint const tidx = get_local_id(0);
   uint gridSize = get_local_size(0);
 
+  // grid stride loop over partitions
   for (uint gid = get_group_id(0); gid < groupCount; gid += get_num_groups(0)) {
     uint gindex = (1 << depth) - 1 + gid;
 
@@ -127,6 +139,7 @@ __kernel void nth_element(__global uint* groupStarts, __global uint* groupLens,
 
     uint N = group_N;
 
+    // calculate the right offsets in global arrays
     if (groupLen == 0) continue;
     __global T* points_src =
         global_points_src + dimension * totalLen + groupStarts[gindex];
@@ -146,10 +159,11 @@ __kernel void nth_element(__global uint* groupStarts, __global uint* groupLens,
 
     uint len = groupLen;
     uint local_histogram[BUCKETCOUNT];
+    // Radix Sort, progress from highest to lowest bits, four at a time
     for (int bucket = 0; bucket < sizeof(T) * 8 / 4; bucket++) {
       if (len == 1) break;
-      uint lowBit = 28 - bucket * 4;
-      uint highBit = 32 - bucket * 4;
+      uint lowBit = sizeof(T) * 8 - 4 - bucket * 4;
+      uint highBit = sizeof(T) * 8 - bucket * 4;
       // if (tidx == 0) printf("\n Bits %d-%d\n", lowBit, highBit);
       for (uint i = 0; i < BUCKETCOUNT; i++) {
         local_histogram[i] = 0;
@@ -157,13 +171,10 @@ __kernel void nth_element(__global uint* groupStarts, __global uint* groupLens,
 
       uint mask = (1 << (highBit - lowBit)) - 1;
 
+      // gridstride loop over elements, create thread local histograms
       for (uint row = tidx; row < len; row += gridSize) {
         uint key = (src[row] >> lowBit) & mask;
         local_histogram[key]++;
-        //        printf("Row: %u  src[row]: %u   key(src[row]):  %u\n", row,
-        //        src[row],
-        //       key);
-        //       barrier(CLK_GLOBAL_MEM_FENCE);
       }
 
       for (uint i = 0; i < BUCKETCOUNT; i++) {
@@ -172,6 +183,11 @@ __kernel void nth_element(__global uint* groupStarts, __global uint* groupLens,
 
       barrier(CLK_GLOBAL_MEM_FENCE);
 
+      // Scan over interleaved local histograms
+      // naively implemented as a sequential sum by thread 0
+      // could be improved by parallel scan, OpenCL 2.0 bultin
+      // kernels, or CUB workgroup kernels
+      // Also finds the partition that contains the nth_element
       __local int selectedBucket;
       if (tidx == 0) {
         selectedBucket = -1;
@@ -181,17 +197,10 @@ __kernel void nth_element(__global uint* groupStarts, __global uint* groupLens,
           hist[i] = sum;
           if (sum > N && selectedBucket < 0) {
             selectedBucket = (i - 1) / gridSize;
-            //            printf("%u>%u at %u = %d\n", sum, N, i,
-            //            selectedBucket);
           }
           sum += t;
         }
         if (selectedBucket == -1) selectedBucket = 15;
-        //        printf("bucket: %u \t  bounds: %u-%u\n", selectedBucket,
-        //       hist[selectedBucket * gridSize],
-        //       (selectedBucket == 15) ? len
-        //                              : hist[(selectedBucket + 1) *
-        //                              gridSize]);
       }
 
       barrier(CLK_GLOBAL_MEM_FENCE | CLK_LOCAL_MEM_FENCE);
@@ -200,6 +209,7 @@ __kernel void nth_element(__global uint* groupStarts, __global uint* groupLens,
         local_histogram[i] = hist[tidx + i * gridSize];
       }
 
+      // copy the partition that contatins the nth_element to another buffer
       for (uint row = tidx; row < len; row += gridSize) {
         uint key = (src[row] >> lowBit) & mask;
         if (key == selectedBucket) {
@@ -213,6 +223,7 @@ __kernel void nth_element(__global uint* groupStarts, __global uint* groupLens,
 
       barrier(CLK_GLOBAL_MEM_FENCE);
 
+      // swap front/back buffer
       __global T* temp = src;
       src = dst;
       dst = temp;
@@ -239,7 +250,7 @@ __kernel void nth_element(__global uint* groupStarts, __global uint* groupLens,
     buckets[0] = 0;
     buckets[1] = 0;
     buckets[2] = 0;
-
+    // buckets with below/equal/above nth_element_value
     for (uint row = tidx; row < groupLen; row += gridSize) {
       uint key = (points_src[row] > nth_element_value) ? 2 : 0;
       key = (points_src[row] == nth_element_value) ? 1 : key;
@@ -251,7 +262,7 @@ __kernel void nth_element(__global uint* groupStarts, __global uint* groupLens,
     hist[tidx + 2 * gridSize] = buckets[2];
 
     barrier(CLK_GLOBAL_MEM_FENCE);
-
+    // scan over interleaved local hisograms by thread 0
     if (tidx == 0) {
       uint sum = 0;
       for (uint i = 0; i < 3 * gridSize; i++) {
@@ -269,6 +280,7 @@ __kernel void nth_element(__global uint* groupStarts, __global uint* groupLens,
     buckets[1] = hist[tidx + gridSize];
     buckets[2] = hist[tidx + 2 * gridSize];
 
+    // Shuffle values into the right partitions
     for (uint row = tidx; row < groupLen; row += gridSize) {
       uint key = (points_src[row] > nth_element_value) ? 2 : 0;
       key = (points_src[row] == nth_element_value) ? 1 : key;
@@ -280,6 +292,8 @@ __kernel void nth_element(__global uint* groupStarts, __global uint* groupLens,
     }
 
     barrier(CLK_GLOBAL_MEM_FENCE);
+
+    // set up groupStarts/groupLens for the next depth
     if (tidx == 0) {
       uint leftChildIndex = (1 << (depth + 1)) - 1 + 2 * gid;
       uint rightChildIndex = (1 << (depth + 1)) - 1 + 2 * gid + 1;
@@ -287,14 +301,10 @@ __kernel void nth_element(__global uint* groupStarts, __global uint* groupLens,
       if (leftChildIndex < totalLen) {
         groupStarts[leftChildIndex] = groupStarts[gindex];
         groupLens[leftChildIndex] = group_N;
-        // printf("%u %u <- : %u:%u-%u\n", depth, gid, leftChildIndex,
-        //       groupStarts[leftChildIndex], groupLens[leftChildIndex]);
       }
       if (rightChildIndex < totalLen) {
         groupStarts[rightChildIndex] = groupStarts[gindex] + group_N + 1;
         groupLens[rightChildIndex] = groupLens[gindex] - group_N - 1;
-        //        printf("%u %u  ->: %u:%u-%u\n", depth, gid, rightChildIndex,
-        //       groupStarts[rightChildIndex], groupLens[rightChildIndex]);
       }
       for (uint d = 0; d < numberOfDimensions + 1; d++) {
         dimensions[gindex + d * totalLen] =

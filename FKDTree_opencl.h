@@ -23,6 +23,7 @@ class FKDTree_OpenCL : public FKDTree<T, numberOfDimensions> {
  public:
   FKDTree_OpenCL(const std::vector<FKDPoint<T, numberOfDimensions>>& points)
       : ocl(1), numberOfPoints(points.size()), hdSync(false) {
+    // unpacks data from point data structure to linear vectors
     h_ids.resize(numberOfPoints);
     for (unsigned int d = 0; d < numberOfDimensions; d++) {
       h_dimensions[d].resize(numberOfPoints);
@@ -34,6 +35,7 @@ class FKDTree_OpenCL : public FKDTree<T, numberOfDimensions> {
       h_ids[i] = points[i].getId();
     }
 
+    // create and initialize all device memory buffers
     std::vector<uint> groupStarts(numberOfPoints);
     std::vector<uint> groupLens(numberOfPoints);
 
@@ -75,6 +77,7 @@ class FKDTree_OpenCL : public FKDTree<T, numberOfDimensions> {
                             blockCount * blockSize * 16 * sizeof(unsigned int),
                             NULL, &error);
     checkOclErrors(error);
+    // indicates that host and device buffers are currently identical
     hdSync = true;
 
     nth_element_kernel =
@@ -128,6 +131,7 @@ class FKDTree_OpenCL : public FKDTree<T, numberOfDimensions> {
     double lastDepth = dtime();
     uint maximum_depth =
         ((unsigned int)(31 - __builtin_clz(numberOfPoints | 1)));
+    // Two different kernels for the different stages
     for (uint depth = 0; depth < maximum_depth; depth++) {
       if (depth < 12) {
         ocl.execute(nth_element_kernel, 1, {blockSize * blockCount},
@@ -147,6 +151,7 @@ class FKDTree_OpenCL : public FKDTree<T, numberOfDimensions> {
                 << " " << (thisDepth - lastDepth) * 1000.0 << "\n";
       lastDepth = thisDepth;
     }
+    // indicate that host and device memory is now out of sync
     hdSync = false;
   }
 
