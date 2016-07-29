@@ -140,13 +140,9 @@ int main(int argc, char* argv[]) {
       runRecursive = true;
       runFKDTree = true;
 
-    }
-#ifdef __USE_OPENCL__
-    else if (arg == "-ocl") {
+    } else if (arg == "-ocl") {
       runOpenCL = true;
-    }
-#endif
-    else if (arg == "-p") {
+    } else if (arg == "-p") {
       if (i + 1 < argc)  // Make sure we aren't at the end of argv!
       {
         i++;
@@ -220,8 +216,9 @@ int main(int argc, char* argv[]) {
       std::cout << "FKDTree wrong" << std::endl;
   }
 
-#ifdef __USE_OPENCL__
   if (runOpenCL) {
+#ifdef __USE_OPENCL__
+
     std::unique_ptr<FKDTree<float, 3>> clKdtree(
         static_cast<FKDTree<float, 3>*>(new FKDTree_OpenCL<float, 3>(points)));
 
@@ -229,22 +226,13 @@ int main(int argc, char* argv[]) {
 
     if (runTheTests) {
       if (clKdtree->test_correct_build())
-        std::cout << "FKDTree built correctly" << std::endl;
+        std::cout << "OpenCL FKDTree built correctly" << std::endl;
       else
-        std::cout << "FKDTree wrong" << std::endl;
-
-      std::vector<unsigned int> partial_results(nPoints);
+        std::cout << "OpenCL FKDTree wrong" << std::endl;
 
       tbb::tick_count start_searching = tbb::tick_count::now();
-
-      /*for (unsigned int i = 0; i < nPoints; i++) {
-        std::vector<unsigned int> foundPoints =
-            clKdtree->search_in_the_box(minPoints[i], maxPoints[i]);
-        if (!test_correct_search(points, foundPoints, minPoints[i],
-                                 maxPoints[i]))
-          exit(1);
-        partial_results[i] = foundPoints.size();
-        }*/
+      auto partial_results =
+          clKdtree->search_in_the_box_multiple(minPoints, maxPoints);
       tbb::tick_count end_searching = tbb::tick_count::now();
       pointsFound =
           std::accumulate(partial_results.begin(), partial_results.end(), 0);
@@ -257,21 +245,19 @@ int main(int argc, char* argv[]) {
       tbb::tick_count start_searching = tbb::tick_count::now();
       for (unsigned int iteration = 0; iteration < numberOfIterations;
            ++iteration) {
-        for (unsigned int i = 0; i < nPoints; i++) {
-          std::vector<unsigned int> foundPoints =
-              clKdtree->search_in_the_box(minPoints[i], maxPoints[i]);
-        }
+        auto result =
+            clKdtree->search_in_the_box_multiple(minPoints, maxPoints);
       }
       tbb::tick_count end_searching = tbb::tick_count::now();
       std::cout << "searching points using OpenCL FKDTree took "
                 << (end_searching - start_searching).seconds() * 1e3 << "ms\n"
                 << std::endl;
     }
+#endif
   }
 
-#endif
-#ifdef __USE_CUDA__
   if (runCuda) {
+#ifdef __USE_CUDA__
     const size_t maxResultSize = 512;
 
     unsigned int* host_ids;
@@ -349,8 +335,9 @@ int main(int argc, char* argv[]) {
     free(host_ids);
     free(host_dimensions);
     free(host_results);
-  }
 #endif
+  }
+
   if (runFKDTree) {
     if (runTheTests) {
       std::vector<unsigned int> partial_results(nPoints);
@@ -546,7 +533,7 @@ int main(int argc, char* argv[]) {
     std::chrono::steady_clock::time_point start_sequential =
         std::chrono::steady_clock::now();
     unsigned int pointsFound = 0;
-    for (unsigned int i = 0; i < nPoints; ++i) {
+    for (int i = 0; i < nPoints; ++i) {
       for (auto p : points) {
         bool inTheBox = true;
 
@@ -581,7 +568,7 @@ int main(int argc, char* argv[]) {
 
     vanilla_tree.clear();
     vanilla_founds.clear();
-    for (unsigned i = 0; i < nPoints; ++i) {
+    for (int i = 0; i < nPoints; ++i) {
       float4 pos = cmssw_points[i];
       vanilla_nodes.emplace_back(i, (float)pos.x, (float)pos.y, (float)pos.z);
       if (i == 0) {
@@ -612,7 +599,7 @@ int main(int argc, char* argv[]) {
         std::chrono::steady_clock::now();
     for (unsigned int iteration = 0; iteration < numberOfIterations;
          ++iteration) {
-      for (unsigned int i = 0; i < nPoints; ++i) {
+      for (int i = 0; i < nPoints; ++i) {
         KDTreeCube kd_searchcube(minPoints[i][0], maxPoints[i][0],
                                  minPoints[i][1], maxPoints[i][1],
                                  minPoints[i][2], maxPoints[i][2]);

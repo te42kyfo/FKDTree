@@ -180,9 +180,9 @@ public:
 			theFront = wrapIndex(theFront + 1);
 			theSize--;
 
-
 			return element;
 		}
+        return T();
 	}
 
 	void pop_front(const unsigned int numberOfElementsToPop)

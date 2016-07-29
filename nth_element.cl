@@ -1,4 +1,4 @@
-// Template parameters: T, numberOfDimensions
+// Template parameters: T, nDimensions
 
 #define FLOOR_LOG2(X) ((unsigned int)(31 - clz(X | 1)))
 
@@ -13,84 +13,82 @@ uint partition_complete_kdtree(uint len) {
     return len - index / 2;
 }
 
+void swapDims(uint i, uint j, uint totalLen, __global T* buffer) {
+  for (uint d = 0; d < nDimensions + 1; d++) {
+    T temp = buffer[i + totalLen * d];
+    buffer[i + totalLen * d] = buffer[j + totalLen * d];
+    buffer[j + totalLen * d] = temp;
+  }
+}
+
 // small partition size kernel. One thread per partition, uses bubblesort
 // to find the parition value.
-__kernel void nth_element_small(
-    __global uint* groupStarts, __global uint* groupLens, uint groupCount,
-    __global T* dimensions, __global T* global_points_src,
-    __global T* global_points_dst, __global T* global_A, __global T* global_B,
-    __global uint* global_hist, uint dimension, uint totalLen, uint depth) {
+__kernel void nth_element_small(__global uint* groupStarts,
+                                __global uint* groupLens, uint groupCount,
+                                __global T* dimensions,
+                                __global T* global_points_src,
+                                __global T* global_points_dst, uint dimension,
+                                uint totalLen, uint depth) {
   uint const tidx = get_global_id(0);
   uint const gridSize = get_global_size(0);
 
+  if (groupCount == 0) return;
+
+  // if (tidx == 0) printf("groupCount: %u\n", groupCount);
   // Grid stride loop over partitions
   for (uint gidx = tidx; gidx < groupCount; gidx += gridSize) {
     uint gindex = (1 << depth) - 1 + gidx;
+
+    // printf("%u %u %u\n", gindex, depth, gidx);
     uint groupLen = groupLens[gindex];
     uint groupStart = groupStarts[gindex];
     uint group_N = partition_complete_kdtree(groupLen);
 
-    uint nth_element_value;
-    // optimized cases for lengths 1 and 2
-    if (groupLen == 1) {
-      nth_element_value = global_points_src[groupStart];
-    }
-    if (groupLen == 2) {
-      T temp[2];
-      temp[0] =
-          min(global_points_src[groupStart], global_points_src[groupStart + 1]);
-      temp[1] =
-          max(global_points_src[groupStart], global_points_src[groupStart + 1]);
-      nth_element_value = temp[group_N];
-    }
-    if (groupLen > 2) {
-      // simple bubblesort
-      for (uint i = 0; i < groupLen; i++) {
-        for (uint j = 0; j < groupLen - 1 - i; j++) {
-          if (global_points_src[groupStart + j] >
-              global_points_src[groupStart + j + 1]) {
-            T temp = global_points_src[groupStart + j];
-            global_points_src[groupStart + j] =
-                global_points_src[groupStart + j + 1];
-            global_points_src[groupStart + j + 1] = temp;
-          }
-        }
-        nth_element_value = global_points_src[groupStart + group_N];
-      }
-    }
-
-    // count values below, equal, above nth_element_value
+    uint nth_element_value = 0;
     uint buckets[3];
 
+    // simple bubblesort
+    for (uint i = 0; i < groupLen; i++) {
+      for (uint j = 0; j < groupLen - 1 - i; j++) {
+        if (global_points_src[groupStart + dimension * totalLen + j] >
+            global_points_src[groupStart + dimension * totalLen + j + 1]) {
+          swapDims(groupStart + j, groupStart + j + 1, totalLen,
+                   global_points_src);
+        }
+      }
+      nth_element_value =
+          global_points_src[groupStart + dimension * totalLen + group_N];
+    }
+
+    //printf("%dth: %f\n", group_N, nth_element_value);
+
+    // count values below, equal, above nth_element_value
     buckets[0] = 0;
     buckets[1] = 0;
     buckets[2] = 0;
 
     for (uint row = 0; row < groupLen; row++) {
-      uint key =
-          (global_points_src[groupStart + row] > nth_element_value) ? 2 : 0;
-      key =
-          (global_points_src[groupStart + row] == nth_element_value) ? 1 : key;
+      T val = global_points_src[groupStart + dimension * totalLen + row];
+      uint key = ((val > nth_element_value) ? 2 : 0);
+      key = ((val == nth_element_value) ? 1 : key);
       buckets[key]++;
     }
-    buckets[2] += buckets[1];
+    buckets[2] = buckets[1] + buckets[0];
     buckets[1] = buckets[0];
     buckets[0] = 0;
 
     // rearange values from points_src to the right partitions in points_dst
     for (uint row = 0; row < groupLen; row++) {
-      uint key =
-          (global_points_src[groupStart + row] > nth_element_value) ? 2 : 0;
-      key =
-          (global_points_src[groupStart + row] == nth_element_value) ? 1 : key;
-      for (uint d = 0; d < numberOfDimensions + 1; d++) {
+      T val = global_points_src[groupStart + dimension * totalLen + row];
+      uint key = ((val > nth_element_value) ? 2 : 0);
+      key = ((val == nth_element_value) ? 1 : key);
+
+      for (uint d = 0; d < nDimensions + 1; d++) {
         global_points_dst[groupStart + d * totalLen + buckets[key]] =
             global_points_src[groupStart + d * totalLen + row];
       }
       buckets[key]++;
     }
-
-    barrier(CLK_GLOBAL_MEM_FENCE);
 
     uint leftChildIndex = (1 << (depth + 1)) - 1 + 2 * gidx;
     uint rightChildIndex = (1 << (depth + 1)) - 1 + 2 * gidx + 1;
@@ -108,7 +106,7 @@ __kernel void nth_element_small(
       //        printf("%u %u  ->: %u:%u-%u\n", depth, gid, rightChildIndex,
       //       groupStarts[rightChildIndex], groupLens[rightChildIndex]);
     }
-    for (uint d = 0; d < numberOfDimensions + 1; d++) {
+    for (uint d = 0; d < nDimensions + 1; d++) {
       dimensions[gindex + d * totalLen] =
           global_points_dst[groupStart + d * totalLen + group_N];
     }
@@ -284,7 +282,7 @@ __kernel void nth_element(__global uint* groupStarts, __global uint* groupLens,
     for (uint row = tidx; row < groupLen; row += gridSize) {
       uint key = (points_src[row] > nth_element_value) ? 2 : 0;
       key = (points_src[row] == nth_element_value) ? 1 : key;
-      for (uint d = 0; d < numberOfDimensions + 1; d++) {
+      for (uint d = 0; d < nDimensions + 1; d++) {
         global_points_dst[groupStarts[gindex] + d * totalLen + buckets[key]] =
             global_points_src[groupStarts[gindex] + d * totalLen + row];
       }
@@ -306,7 +304,7 @@ __kernel void nth_element(__global uint* groupStarts, __global uint* groupLens,
         groupStarts[rightChildIndex] = groupStarts[gindex] + group_N + 1;
         groupLens[rightChildIndex] = groupLens[gindex] - group_N - 1;
       }
-      for (uint d = 0; d < numberOfDimensions + 1; d++) {
+      for (uint d = 0; d < nDimensions + 1; d++) {
         dimensions[gindex + d * totalLen] =
             global_points_dst[groupStarts[gindex] + d * totalLen + group_N];
       }

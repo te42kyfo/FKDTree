@@ -11,18 +11,17 @@ class FKDTree {
 
   virtual std::vector<unsigned int> search_in_the_box(
       const FKDPoint<TYPE, numberOfDimensions>& minPoint,
-      const FKDPoint<TYPE, numberOfDimensions>& maxPoint) const = 0;
+      const FKDPoint<TYPE, numberOfDimensions>& maxPoint) = 0;
 
-  virtual std::vector<std::vector<unsigned int>> search_in_the_box_multiple(
+  virtual std::vector<unsigned int> search_in_the_box_multiple(
       const std::vector<FKDPoint<TYPE, numberOfDimensions>>& minPoints,
-      const std::vector<FKDPoint<TYPE, numberOfDimensions>>& maxPoints)
-      const = 0;
+      const std::vector<FKDPoint<TYPE, numberOfDimensions>>& maxPoints) = 0;
 
   virtual void build() = 0;
   virtual std::vector<TYPE> const& getDimensionVector(const int dimension) = 0;
   virtual std::vector<unsigned int> const& getIdVector() = 0;
 
-  bool test_correct_build(unsigned int index = 0, int dimension = 0)  {
+  bool test_correct_build(unsigned int index = 0, int dimension = 0) {
     unsigned int theNumberOfPoints = getDimensionVector(0).size();
     unsigned int leftSonIndexInArray = 2 * index + 1;
     unsigned int rightSonIndexInArray = leftSonIndexInArray + 1;

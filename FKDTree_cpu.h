@@ -10,17 +10,17 @@
 #include "FKDPoint.h"
 #include "FKDTree.h"
 #include "FQueue.h"
-#define FLOOR_LOG2(X) ((unsigned int)(31 - __builtin_clz(X | 1)))
-#define CEIL_LOG2(X) ((unsigned int)(X <= 1 ? 0 : 32 - __builtin_clz(X - 1)))
+#define FLOOR_LOG2(X) ((unsigned int)(31 - __builtin_clz((X) | 1)))
+#define CEIL_LOG2(X) ((unsigned int)(X <= 1 ? 0 : 32 - __builtin_clz((X)-1)))
 
 template <class TYPE, unsigned int numberOfDimensions>
 class FKDTree_CPU : public FKDTree<TYPE, numberOfDimensions> {
  public:
   FKDTree_CPU(const std::vector<FKDPoint<TYPE, numberOfDimensions>>& points)
       : theDepth(FLOOR_LOG2(points.size())),
+        thePoints(begin(points), end(points)),
         theDimensions(numberOfDimensions, std::vector<TYPE>(points.size())),
-        theIds(points.size()),
-        thePoints(begin(points), end(points)) {}
+        theIds(points.size()) {}
 
   std::vector<unsigned int> search_in_the_box_branchless(
       const FKDPoint<TYPE, numberOfDimensions>& minPoint,
@@ -122,7 +122,7 @@ class FKDTree_CPU : public FKDTree<TYPE, numberOfDimensions> {
 
   std::vector<unsigned int> search_in_the_box(
       const FKDPoint<TYPE, numberOfDimensions>& minPoint,
-      const FKDPoint<TYPE, numberOfDimensions>& maxPoint) const {
+      const FKDPoint<TYPE, numberOfDimensions>& maxPoint) {
     FQueue<unsigned int> indecesToVisit(256);
     std::vector<unsigned int> result;
     result.reserve(16);
@@ -207,14 +207,15 @@ class FKDTree_CPU : public FKDTree<TYPE, numberOfDimensions> {
   }
 
   std::vector<TYPE> const& getDimensionVector(const int dimension) {
-    if (dimension < numberOfDimensions) return theDimensions[dimension];
+    if ((uint)dimension < numberOfDimensions) return theDimensions[dimension];
+    return theDimensions[0];
   }
   std::vector<unsigned int> const& getIdVector() { return theIds; }
 
-  std::vector<std::vector<unsigned int>> search_in_the_box_multiple(
+  std::vector<unsigned int> search_in_the_box_multiple(
       const std::vector<FKDPoint<TYPE, numberOfDimensions>>& minPoints,
-      const std::vector<FKDPoint<TYPE, numberOfDimensions>>& maxPoints) const {
-    return std::vector<std::vector<unsigned int>>();
+      const std::vector<FKDPoint<TYPE, numberOfDimensions>>& maxPoints) {
+    return std::vector<unsigned int>();
   }
 
   void build() {
@@ -228,7 +229,7 @@ class FKDTree_CPU : public FKDTree<TYPE, numberOfDimensions> {
     for (unsigned int depth = 0; depth < theDepth; ++depth) {
       dimension = depth % numberOfDimensions;
       unsigned int firstIndexInDepth = (1 << depth) - 1;
-      for (unsigned int indexInDepth = 0; indexInDepth < (1 << depth);
+      for (unsigned int indexInDepth = 0; indexInDepth < ((uint)1 << depth);
            ++indexInDepth) {
         unsigned int indexInArray = firstIndexInDepth + indexInDepth;
         unsigned int leftSonIndexInArray = 2 * indexInArray + 1;
