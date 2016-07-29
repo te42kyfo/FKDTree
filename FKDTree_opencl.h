@@ -195,6 +195,7 @@ class FKDTree_OpenCL : public FKDTree<T, nDimensions> {
                     d_dimensions, d_points_src, d_points_dst, d_A, d_B, d_temp,
                     depth % nDimensions, nPoints, depth);
         smallKernelUsed = false;
+        std::swap(d_points_src, d_points_dst);
       } else {
         ocl.execute(nth_element_kernel_small, 1, {blockSize * blockCount},
                     {blockSize}, d_groupStarts, d_groupLens,
@@ -204,7 +205,6 @@ class FKDTree_OpenCL : public FKDTree<T, nDimensions> {
         smallKernelUsed = true;
       }
 
-      std::swap(d_points_src, d_points_dst);
       ocl.finish();
       double thisDepth = dtime();
       if (smallKernelUsed)

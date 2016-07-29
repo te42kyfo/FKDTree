@@ -60,10 +60,10 @@ __kernel void nth_element_small(__global uint* groupStarts,
           global_points_src[groupStart + dimension * totalLen + group_N];
     }
 
-    //printf("%dth: %f\n", group_N, nth_element_value);
+    // printf("%dth: %f\n", group_N, nth_element_value);
 
     // count values below, equal, above nth_element_value
-    buckets[0] = 0;
+    /*    buckets[0] = 0;
     buckets[1] = 0;
     buckets[2] = 0;
 
@@ -89,7 +89,7 @@ __kernel void nth_element_small(__global uint* groupStarts,
       }
       buckets[key]++;
     }
-
+    */
     uint leftChildIndex = (1 << (depth + 1)) - 1 + 2 * gidx;
     uint rightChildIndex = (1 << (depth + 1)) - 1 + 2 * gidx + 1;
 
@@ -108,7 +108,7 @@ __kernel void nth_element_small(__global uint* groupStarts,
     }
     for (uint d = 0; d < nDimensions + 1; d++) {
       dimensions[gindex + d * totalLen] =
-          global_points_dst[groupStart + d * totalLen + group_N];
+          global_points_src[groupStart + d * totalLen + group_N];
     }
   }
 }
