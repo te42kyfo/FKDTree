@@ -22,6 +22,7 @@ double dtime() {
 
 #define MAX_INTERMEDIATES 8192
 #define MAX_RESULTS 1024
+#define THREADS_PER_QUERY 8
 
 template <class T, unsigned int nDimensions>
 class FKDTree_OpenCL : public FKDTree<T, nDimensions> {
@@ -77,6 +78,17 @@ class FKDTree_OpenCL : public FKDTree<T, nDimensions> {
     d_temp = clCreateBuffer(ocl.context, CL_MEM_READ_WRITE,
                             blockCount * blockSize * 16 * sizeof(unsigned int),
                             NULL, &error);
+    d_search_intermediates_A =
+        clCreateBuffer(ocl.context, CL_MEM_READ_WRITE,
+                       MAX_INTERMEDIATES * blockSize / THREADS_PER_QUERY *
+                           blockCount * sizeof(unsigned int),
+                       NULL, &error);
+    d_search_intermediates_B =
+        clCreateBuffer(ocl.context, CL_MEM_READ_WRITE,
+                       MAX_INTERMEDIATES * blockSize / THREADS_PER_QUERY *
+                           blockCount * sizeof(unsigned int),
+                       NULL, &error);
+
     checkOclErrors(error);
     // indicates that host and device buffers are currently identical
     hdSync = true;
@@ -90,7 +102,8 @@ class FKDTree_OpenCL : public FKDTree<T, nDimensions> {
     searchInTheBox_kernel_2 = ocl.buildKernel(
         "searchInTheBox2.cl", "searchInTheBox",
         std::string("-D blockSize=" + std::to_string(blockSize) +
-                    " -D T=float -D threadsPerQuery=8 -D maxResults=" +
+                    " -D T=float -D threadsPerQuery=" +
+                    std::to_string(THREADS_PER_QUERY) + " -D maxResults=" +
                     std::to_string(MAX_RESULTS) + " -D maxIntermediates=" +
                     std::to_string(MAX_RESULTS) + " -D nDimensions=" +
                     std::to_string(nDimensions)));
@@ -137,31 +150,19 @@ class FKDTree_OpenCL : public FKDTree<T, nDimensions> {
     }
     cl_mem d_minPoints = ocl.createAndUpload(h_minPoints);
     cl_mem d_maxPoints = ocl.createAndUpload(h_maxPoints);
-
-    cl_int error;
-    cl_mem d_A = clCreateBuffer(
-        ocl.context, CL_MEM_READ_WRITE,
-        MAX_INTERMEDIATES * blockSize * blockCount * sizeof(unsigned int), NULL,
-        &error);
-    cl_mem d_B = clCreateBuffer(
-        ocl.context, CL_MEM_READ_WRITE,
-        MAX_INTERMEDIATES * blockSize * blockCount * sizeof(unsigned int), NULL,
-        &error);
-
     cl_mem d_results = ocl.createAndUpload<uint>(h_results);
 
     ocl.execute(searchInTheBox_kernel_2, 1, {blockSize * blockCount},
                 {blockSize}, d_dimensions, d_results, d_minPoints, d_maxPoints,
-                d_A, d_B, nPoints, (uint)minPoints.size());
-
+                d_search_intermediates_A, d_search_intermediates_B, nPoints,
+                (uint)minPoints.size());
+    ocl.finish();
     checkOclErrors(clEnqueueReadBuffer(ocl.queue, d_results, true, 0,
                                        minPoints.size() * sizeof(uint),
                                        h_results.data(), 0, NULL, NULL));
-
+    clReleaseMemObject(d_results);
     clReleaseMemObject(d_minPoints);
     clReleaseMemObject(d_maxPoints);
-    clReleaseMemObject(d_A);
-    clReleaseMemObject(d_B);
     return h_results;
   }
 
@@ -251,12 +252,15 @@ class FKDTree_OpenCL : public FKDTree<T, nDimensions> {
   cl_mem d_B;
   cl_mem d_temp;
 
+  cl_mem d_search_intermediates_A;
+  cl_mem d_search_intermediates_B;
+
   std::array<std::vector<T>, nDimensions> h_dimensions;
   std::vector<unsigned int> h_ids;
   bool hdSync;
 
-  static const uint blockSize = 8;
-  static const uint blockCount = 8;
+  static const uint blockSize = 64;
+  static const uint blockCount = 64;
 };
 
 #endif /* FKDTREE_FKDTREE_OPENCL_H_ */

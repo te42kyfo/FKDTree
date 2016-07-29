@@ -11,8 +11,8 @@ bool isInBox(T* p, T* minP, T* maxP) {
 
 __kernel void searchInTheBox(__global T* dimensions, __global uint* results,
                              __global T* minPoints, __global T* maxPoints,
-                             __global uint* A, __global uint* B, uint nPoints,
-                             uint nQueries) {
+                             __global uint* global_A, __global uint* global_B,
+                             uint nPoints, uint nQueries) {
   uint const groupId = get_group_id(0) * get_local_size(0) / threadsPerQuery +
                        get_local_id(0) / threadsPerQuery;
   uint const localGroupId = get_local_id(0) / threadsPerQuery;
@@ -24,8 +24,8 @@ __kernel void searchInTheBox(__global T* dimensions, __global uint* results,
   __local uint nextLens[blockSize / threadsPerQuery];
   __local uint resultCount[blockSize / threadsPerQuery];
 
-  __global uint* queueSrc = A;
-  __global uint* queueDst = B;
+  __global uint* queueSrc = global_A + maxIntermediates * groupId;
+  __global uint* queueDst = global_B + maxIntermediates * groupId;
 
   for (uint loopQueryId = groupId;
        loopQueryId < ((nQueries - 1) / queriesPerGroup + 1) * queriesPerGroup;
@@ -42,7 +42,7 @@ __kernel void searchInTheBox(__global T* dimensions, __global uint* results,
     for (uint d = 0; d < nDimensions; d++) {
       minPoint[d] = minPoints[d * nQueries + queryId];
       maxPoint[d] = maxPoints[d * nQueries + queryId];
-      //if (!masked && groupLane == 0)
+      //      if (!masked && groupLane == 0)
       //  printf("%d %d: %f %f\n", groupId, queryId, minPoint[d], maxPoint[d]);
     }
 
@@ -65,14 +65,13 @@ __kernel void searchInTheBox(__global T* dimensions, __global uint* results,
         uint rightChildIndex = queueSrc[p] * 2 + 2;
         for (uint d = 0; d < nDimensions; d++) {
           point[d] = dimensions[d * nPoints + queueSrc[p]];
-          //         if (groupLane == 0 && !masked)
-          // printf("%d %d @ %d: %f\n", groupId, queryId, queueSrc[p], point[d]);
+          //     if (groupLane == 0 && !masked)
+          //  printf("%d %d @ %d: %f\n", groupId, queryId, queueSrc[p], point[d]);
         }
         if (isInBox(point, minPoint, maxPoint)) {
           if (!masked) {
             uint val = atomic_inc(&results[queryId]);
-            // printf("%d %d: f: %u %u\n", groupId, queryId, val + 1,
-            // queueSrc[p]);
+            //printf("%d %d: f: %u %u\n", groupId, queryId, val + 1, queueSrc[p]);
           }
         }
         if (leftChildIndex < nPoints &&

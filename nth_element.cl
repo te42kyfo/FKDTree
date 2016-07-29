@@ -62,34 +62,6 @@ __kernel void nth_element_small(__global uint* groupStarts,
 
     // printf("%dth: %f\n", group_N, nth_element_value);
 
-    // count values below, equal, above nth_element_value
-    /*    buckets[0] = 0;
-    buckets[1] = 0;
-    buckets[2] = 0;
-
-    for (uint row = 0; row < groupLen; row++) {
-      T val = global_points_src[groupStart + dimension * totalLen + row];
-      uint key = ((val > nth_element_value) ? 2 : 0);
-      key = ((val == nth_element_value) ? 1 : key);
-      buckets[key]++;
-    }
-    buckets[2] = buckets[1] + buckets[0];
-    buckets[1] = buckets[0];
-    buckets[0] = 0;
-
-    // rearange values from points_src to the right partitions in points_dst
-    for (uint row = 0; row < groupLen; row++) {
-      T val = global_points_src[groupStart + dimension * totalLen + row];
-      uint key = ((val > nth_element_value) ? 2 : 0);
-      key = ((val == nth_element_value) ? 1 : key);
-
-      for (uint d = 0; d < nDimensions + 1; d++) {
-        global_points_dst[groupStart + d * totalLen + buckets[key]] =
-            global_points_src[groupStart + d * totalLen + row];
-      }
-      buckets[key]++;
-    }
-    */
     uint leftChildIndex = (1 << (depth + 1)) - 1 + 2 * gidx;
     uint rightChildIndex = (1 << (depth + 1)) - 1 + 2 * gidx + 1;
 
