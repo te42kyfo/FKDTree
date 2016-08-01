@@ -49,12 +49,12 @@ class OCL {
 
     if (selection >= options.size()) selection = 0;
     for (unsigned int i = 0; i < options.size(); i++) {
-      std::cout << "# ";
+      std::cerr << "# ";
       if (i == selection)
-        std::cout << " * ";
+        std::cerr << " * ";
       else
-        std::cout << "   ";
-      std::cout << platformInfo(options[i].first, CL_PLATFORM_NAME) << ": "
+        std::cerr << "   ";
+      std::cerr << platformInfo(options[i].first, CL_PLATFORM_NAME) << ": "
                 << deviceInfo(options[i].second, CL_DEVICE_NAME) << "\n";
     }
     device = options[selection].second;
@@ -76,7 +76,7 @@ class OCL {
     try {
       std::ifstream t(filename.c_str());
       if (!t) {
-        std::cout << "buildKernel: Could not open " << filename << "\n";
+        std::cerr << "buildKernel: Could not open " << filename << "\n";
         exit(1);
       }
       source = std::string(std::istreambuf_iterator<char>(t),
@@ -104,7 +104,7 @@ class OCL {
       char log[logsize];
       checkOclErrors(clGetProgramBuildInfo(
           program, device, CL_PROGRAM_BUILD_LOG, logsize, log, nullptr));
-      std::cout << "Build log of file " << filename << " :\n" << log << "\n";
+      std::cerr << "Build log of file " << filename << " :\n" << log << "\n";
     }
 
     cl_kernel kernel = clCreateKernel(program, kernel_name.c_str(), &error);

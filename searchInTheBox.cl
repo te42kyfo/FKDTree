@@ -1,7 +1,7 @@
-#define MAX_SIZE 128
+#define MAX_SIZE 1024
 #define NUM_DIMENSIONS 3
-#define MAX_RESULT_SIZE 256
-#define RANGE 0.2f;
+#define MAX_RESULT_SIZE 512
+#define RANGE 0.51f;
 
 typedef struct
 {
@@ -125,7 +125,7 @@ __kernel void SearchInTheKDBox(unsigned int nPoints, __global float* dimensions,
 //							printf("index: %d added to results", index);
 //						}
 
-						results[resultIndex] = index;
+                      //results[resultIndex] = index;
 						resultIndex++;
 						pointsFound++;
 					}
@@ -146,8 +146,8 @@ __kernel void SearchInTheKDBox(unsigned int nPoints, __global float* dimensions,
 					{
 						push_back(&indecesToVisit,indexToAdd);
 
-						if(indecesToVisit.size == MAX_SIZE)
-						printf("queue limit hit");
+                        //						if(indecesToVisit.size == MAX_SIZE)
+						//printf("queue limit hit");
 					}
 				}
 			}

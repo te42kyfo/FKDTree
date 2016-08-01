@@ -1,5 +1,5 @@
-CFLAGS= -std=c++11 -march=native -Wall -O3  -g
-LIBS = -ltbb
+CFLAGS= -std=c++11 -march=native -Wall -O3  -g -fopenmp
+LIBS = -ltbb -fopenmp
 
 CUDAOBJECT =
 USE_CUDA = NO

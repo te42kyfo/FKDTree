@@ -1,5 +1,4 @@
 #include <algorithm>
-
 #include <iomanip>
 #include <iostream>
 #include <random>
@@ -10,30 +9,27 @@
 using namespace std;
 
 int main(int argc, char** argv) {
-  const uint boxCount = 1024;
-  for (cl_uint len = (1u << 0); len < (1u << 24); len *= 1.9 + 1) {
+  tbb::task_scheduler_init init(4);
+  for (cl_uint len = (1u << 14); len < (1u << 19); len = len * 1.5 + 1) {
+    uint boxCount = len;
     vector<FKDPoint<float, 3>> host_data(len);
     vector<FKDPoint<float, 3>> minPoints(boxCount);
     vector<FKDPoint<float, 3>> maxPoints(boxCount);
 
     random_device rd;
     default_random_engine eng(rd());
-    uniform_real_distribution<float> dis;
+    uniform_real_distribution<float> dis(0.0f, 10.1f);
 
     for (unsigned int i = 0; i < len; i++) {
-      host_data[i] = {i, i * 2, i * 3, i};
+      host_data[i] = {dis(eng), dis(eng), dis(eng), i};
       // cout << "p: " << host_data[i][0] << " " << host_data[i][1] << " "
       //     << host_data[i][2] << "\n";
     }
     for (uint i = 0; i < boxCount; i++) {
-      float x1 = dis(eng);
-      float x2 = dis(eng);
-      float y1 = dis(eng);
-      float y2 = dis(eng);
-      float z1 = dis(eng);
-      float z2 = dis(eng);
-      minPoints[i] = {min(x1, x2), min(y1, y2), min(z1, z2), i};
-      maxPoints[i] = {max(x1, x2), max(y1, y2), max(z1, z2), i};
+      minPoints[i] = {host_data[i][0] - 0.51f, host_data[i][1] - 0.51f,
+                      host_data[i][2] - 0.51f, i};
+      maxPoints[i] = {host_data[i][0] + 0.51f, host_data[i][1] + 0.51f,
+                      host_data[i][2] + 0.51f, i};
     }
 
     FKDTree_OpenCL<float, 3> clKdtree(host_data);
@@ -45,7 +41,9 @@ int main(int argc, char** argv) {
     kdtree.build();
     double t3 = dtime();
 
-    bool identical = true;
+    cout << len << " " << t2 - t1 << " " << t3 - t2 << " ";
+
+    /*bool identical = true;
     for (uint d = 0; d < 3; d++) {
       auto dataCL = clKdtree.getDimensionVector(d);
       auto dataCPU = kdtree.getDimensionVector(d);
@@ -56,15 +54,34 @@ int main(int argc, char** argv) {
           identical = false;
         }
       }
-    }
+      }
     std::cout << len << " " << t2 - t1 << " " << t3 - t2;
     if (identical)
       std::cout << "\t identical\n";
     else
       cout << "\t Mismatch\n";
+    */
 
-    //    auto results = clKdtree.search_in_the_box_multiple(minPoints,
-    //    maxPoints);
+    auto results = clKdtree.search_in_the_box_multiple(minPoints, maxPoints);
+    results = clKdtree.search_in_the_box_multiple_legacy(minPoints, maxPoints);
+
+    double branchless_start = dtime();
+#pragma omp parallel for
+    for (uint i = 0; i < len; i++) {
+      std::vector<unsigned int> foundPoints =
+          kdtree.search_in_the_box_branchless(minPoints[i], maxPoints[i]);
+    }
+    double branchless_end = dtime();
+    std::cout << (branchless_end - branchless_start) << " ";
+
+    double BFS_start = dtime();
+#pragma omp parallel for
+    for (uint i = 0; i < len; i++) {
+      std::vector<unsigned int> foundPoints =
+          kdtree.search_in_the_box_BFS(minPoints[i], maxPoints[i]);
+    }
+    double BFS_end = dtime();
+    std::cout << (BFS_end - BFS_start) << " ";
 
     cout << "\n";
   }

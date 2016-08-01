@@ -22,7 +22,7 @@ double dtime() {
 
 #define MAX_INTERMEDIATES 8192
 #define MAX_RESULTS 1024
-#define THREADS_PER_QUERY 8
+#define THREADS_PER_QUERY 4
 
 template <class T, unsigned int nDimensions>
 class FKDTree_OpenCL : public FKDTree<T, nDimensions> {
@@ -99,6 +99,8 @@ class FKDTree_OpenCL : public FKDTree<T, nDimensions> {
     nth_element_kernel_small = ocl.buildKernel(
         "nth_element.cl", "nth_element_small",
         std::string("-D T=uint -D nDimensions=" + std::to_string(nDimensions)));
+    searchInTheBox_kernel =
+        ocl.buildKernel("searchInTheBox.cl", "SearchInTheKDBox", "");
     searchInTheBox_kernel_2 = ocl.buildKernel(
         "searchInTheBox2.cl", "searchInTheBox",
         std::string("-D blockSize=" + std::to_string(blockSize) +
@@ -118,6 +120,8 @@ class FKDTree_OpenCL : public FKDTree<T, nDimensions> {
     clReleaseMemObject(d_temp);
     clReleaseMemObject(d_groupStarts);
     clReleaseMemObject(d_groupLens);
+    clReleaseMemObject(d_search_intermediates_A);
+    clReleaseMemObject(d_search_intermediates_B);
   }
 
   std::vector<unsigned int> search_in_the_box(
@@ -152,17 +156,48 @@ class FKDTree_OpenCL : public FKDTree<T, nDimensions> {
     cl_mem d_maxPoints = ocl.createAndUpload(h_maxPoints);
     cl_mem d_results = ocl.createAndUpload<uint>(h_results);
 
+    double search_start = dtime();
     ocl.execute(searchInTheBox_kernel_2, 1, {blockSize * blockCount},
                 {blockSize}, d_dimensions, d_results, d_minPoints, d_maxPoints,
                 d_search_intermediates_A, d_search_intermediates_B, nPoints,
                 (uint)minPoints.size());
     ocl.finish();
+    double search_end = dtime();
+    std::cout << (search_end - search_start) << " ";
     checkOclErrors(clEnqueueReadBuffer(ocl.queue, d_results, true, 0,
                                        minPoints.size() * sizeof(uint),
                                        h_results.data(), 0, NULL, NULL));
     clReleaseMemObject(d_results);
     clReleaseMemObject(d_minPoints);
     clReleaseMemObject(d_maxPoints);
+    return h_results;
+  }
+
+  std::vector<unsigned int> search_in_the_box_multiple_legacy(
+      const std::vector<FKDPoint<T, nDimensions>>& minPoints,
+      const std::vector<FKDPoint<T, nDimensions>>& maxPoints) {
+    /*    auto gpuData = ocl.download<float>(d_dimensions);
+    for (uint d = 0; d < nDimensions; d++) {
+      for (uint i = 0; i < nPoints; i++) {
+        std::cout <<  gpuData[d*nPoints + i] << " ";
+      }
+      std::cout << "\n";
+      }*/
+
+    std::vector<uint> h_results(minPoints.size());
+
+    cl_mem d_results = ocl.createAndUpload<uint>(h_results);
+
+    double search_start = dtime();
+    ocl.execute(searchInTheBox_kernel, 1, {(nPoints / 128 + 1) * 128}, {128},
+                nPoints, d_dimensions, d_dimensions, d_results);
+    ocl.finish();
+    double search_end = dtime();
+    std::cout << (search_end - search_start) << " ";
+    checkOclErrors(clEnqueueReadBuffer(ocl.queue, d_results, true, 0,
+                                       minPoints.size() * sizeof(uint),
+                                       h_results.data(), 0, NULL, NULL));
+    clReleaseMemObject(d_results);
     return h_results;
   }
 
@@ -181,7 +216,7 @@ class FKDTree_OpenCL : public FKDTree<T, nDimensions> {
   }
 
   void build() {
-    double lastDepth = dtime();
+    // double lastDepth = dtime();
     uint maximum_depth = ((unsigned int)(31 - __builtin_clz(nPoints | 1)));
 
     // auto gpudata = ocl.download<float>(d_points_src);
@@ -189,13 +224,13 @@ class FKDTree_OpenCL : public FKDTree<T, nDimensions> {
 
     // Two different kernels for the different stages
     for (uint depth = 0; depth <= maximum_depth; depth++) {
-      bool smallKernelUsed = false;
+      //      bool smallKernelUsed = false;
       if (nPoints / (1 << depth) > 200) {
         ocl.execute(nth_element_kernel, 1, {blockSize * blockCount},
                     {blockSize}, d_groupStarts, d_groupLens, (1 << depth),
                     d_dimensions, d_points_src, d_points_dst, d_A, d_B, d_temp,
                     depth % nDimensions, nPoints, depth);
-        smallKernelUsed = false;
+        // smallKernelUsed = false;
         std::swap(d_points_src, d_points_dst);
       } else {
         ocl.execute(nth_element_kernel_small, 1, {blockSize * blockCount},
@@ -203,18 +238,18 @@ class FKDTree_OpenCL : public FKDTree<T, nDimensions> {
                     std::min(((uint)1 << depth), nPoints - (1 << depth) + 1),
                     d_dimensions, d_points_src, d_points_dst,
                     depth % nDimensions, nPoints, depth);
-        smallKernelUsed = true;
+        // smallKernelUsed = true;
       }
 
       ocl.finish();
-      double thisDepth = dtime();
+      /*      double thisDepth = dtime();
       if (smallKernelUsed)
         std::cout << "s";
       else
         std::cout << " ";
       std::cout << std::setw(3) << depth << " " << std::setw(4) << " "
                 << (thisDepth - lastDepth) * 1000.0 << "\n";
-      lastDepth = thisDepth;
+                lastDepth = thisDepth;*/
     }
     // indicate that host and device memory is now out of sync
     hdSync = false;
@@ -240,6 +275,7 @@ class FKDTree_OpenCL : public FKDTree<T, nDimensions> {
 
   cl_kernel nth_element_kernel;
   cl_kernel nth_element_kernel_small;
+  cl_kernel searchInTheBox_kernel;
   cl_kernel searchInTheBox_kernel_2;
 
   cl_mem d_groupStarts;

@@ -171,7 +171,8 @@ int main(int argc, char* argv[]) {
   //	FKDPoint<float, 3> minPoint(0, 1, 8);
   //	FKDPoint<float, 3> maxPoint(0.4, 1.2, 8.3);
 
-  std::default_random_engine rd_gen;
+  std::random_device rd;
+  std::default_random_engine rd_gen(rd());
   std::uniform_real_distribution<float> udis(0.0f, 10.1f);
 
   for (int i = 0; i < nPoints; ++i) {
@@ -219,8 +220,8 @@ int main(int argc, char* argv[]) {
   if (runOpenCL) {
 #ifdef __USE_OPENCL__
 
-    std::unique_ptr<FKDTree<float, 3>> clKdtree(
-        static_cast<FKDTree<float, 3>*>(new FKDTree_OpenCL<float, 3>(points)));
+    std::unique_ptr<FKDTree_OpenCL<float, 3>> clKdtree(
+        new FKDTree_OpenCL<float, 3>(points));
 
     clKdtree->build();
 
@@ -232,7 +233,7 @@ int main(int argc, char* argv[]) {
 
       tbb::tick_count start_searching = tbb::tick_count::now();
       auto partial_results =
-          clKdtree->search_in_the_box_multiple(minPoints, maxPoints);
+          clKdtree->search_in_the_box_multiple_legacy(minPoints, maxPoints);
       tbb::tick_count end_searching = tbb::tick_count::now();
       pointsFound =
           std::accumulate(partial_results.begin(), partial_results.end(), 0);
@@ -246,7 +247,7 @@ int main(int argc, char* argv[]) {
       for (unsigned int iteration = 0; iteration < numberOfIterations;
            ++iteration) {
         auto result =
-            clKdtree->search_in_the_box_multiple(minPoints, maxPoints);
+            clKdtree->search_in_the_box_multiple_legacy(minPoints, maxPoints);
       }
       tbb::tick_count end_searching = tbb::tick_count::now();
       std::cout << "searching points using OpenCL FKDTree took "
