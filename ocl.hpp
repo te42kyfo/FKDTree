@@ -36,14 +36,16 @@ class OCL {
     checkOclErrors(clGetPlatformIDs(num_platforms, platforms.data(), NULL));
 
     for (auto p : platforms) {
-      cl_uint num_devices;
+      cl_uint num_devices = 0;
       checkOclErrors(
           clGetDeviceIDs(p, CL_DEVICE_TYPE_ALL, 0, NULL, &num_devices));
-      std::vector<cl_device_id> devices(num_devices);
-      checkOclErrors(clGetDeviceIDs(p, CL_DEVICE_TYPE_ALL, num_devices,
-                                    devices.data(), NULL));
-      for (auto d : devices) {
-        options.push_back(std::make_pair(p, d));
+      if (num_devices != 0) {
+        std::vector<cl_device_id> devices(num_devices);
+        checkOclErrors(clGetDeviceIDs(p, CL_DEVICE_TYPE_ALL, num_devices,
+                                      devices.data(), NULL));
+        for (auto d : devices) {
+          options.push_back(std::make_pair(p, d));
+        }
       }
     }
 
