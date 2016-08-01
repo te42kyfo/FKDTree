@@ -9,7 +9,6 @@
 using namespace std;
 
 int main(int argc, char** argv) {
-  tbb::task_scheduler_init init(4);
   for (cl_uint len = (1u << 14); len < (1u << 19); len = len * 1.5 + 1) {
     uint boxCount = len;
     vector<FKDPoint<float, 3>> host_data(len);
