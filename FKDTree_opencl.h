@@ -173,7 +173,7 @@ class FKDTree_OpenCL : public FKDTree<T, nDimensions> {
     return h_results;
   }
 
-  std::vector<unsigned int> search_in_the_box_multiple_legacy(
+  std::vector<unsigned int> search_in_the_box_multiple_old(
       const std::vector<FKDPoint<T, nDimensions>>& minPoints,
       const std::vector<FKDPoint<T, nDimensions>>& maxPoints) {
     /*    auto gpuData = ocl.download<float>(d_dimensions);

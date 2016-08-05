@@ -233,7 +233,7 @@ int main(int argc, char* argv[]) {
 
       tbb::tick_count start_searching = tbb::tick_count::now();
       auto partial_results =
-          clKdtree->search_in_the_box_multiple_legacy(minPoints, maxPoints);
+          clKdtree->search_in_the_box_multiple(minPoints, maxPoints);
       tbb::tick_count end_searching = tbb::tick_count::now();
       pointsFound =
           std::accumulate(partial_results.begin(), partial_results.end(), 0);
@@ -247,7 +247,7 @@ int main(int argc, char* argv[]) {
       for (unsigned int iteration = 0; iteration < numberOfIterations;
            ++iteration) {
         auto result =
-            clKdtree->search_in_the_box_multiple_legacy(minPoints, maxPoints);
+            clKdtree->search_in_the_box_multiple(minPoints, maxPoints);
       }
       tbb::tick_count end_searching = tbb::tick_count::now();
       std::cout << "searching points using OpenCL FKDTree took "
