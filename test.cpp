@@ -5,10 +5,12 @@
 #include <vector>
 #include "FKDTree_cpu.h"
 #include "FKDTree_opencl.h"
+#include "dtime.hpp"
 
 using namespace std;
 
 int main(int argc, char** argv) {
+
   for (cl_uint len = (1u << 14); len < (1u << 19); len = len * 1.5 + 1) {
     uint boxCount = len;
     vector<FKDPoint<float, 3>> host_data(len);
@@ -40,7 +42,9 @@ int main(int argc, char** argv) {
     kdtree.build();
     double t3 = dtime();
 
-    cout << len << " " << t2 - t1 << " " << t3 - t2 << " ";
+    cout << setprecision(3);
+    cout << "Points: " << len << "  OpenCL build:" << t2 - t1
+         << "    CPU build: " << t3 - t2 << " ";
 
     /*bool identical = true;
     for (uint d = 0; d < 3; d++) {
@@ -62,7 +66,7 @@ int main(int argc, char** argv) {
     */
 
     auto results = clKdtree.search_in_the_box_multiple(minPoints, maxPoints);
-    results = clKdtree.search_in_the_box_multiple_legacy(minPoints, maxPoints);
+    results = clKdtree.search_in_the_box_multiple_old(minPoints, maxPoints);
 
     double branchless_start = dtime();
 #pragma omp parallel for
@@ -71,7 +75,8 @@ int main(int argc, char** argv) {
           kdtree.search_in_the_box_branchless(minPoints[i], maxPoints[i]);
     }
     double branchless_end = dtime();
-    std::cout << (branchless_end - branchless_start) << " ";
+    std::cout << "   CPU branchless: " << (branchless_end - branchless_start)
+              << " ";
 
     double BFS_start = dtime();
 #pragma omp parallel for
@@ -80,7 +85,7 @@ int main(int argc, char** argv) {
           kdtree.search_in_the_box_BFS(minPoints[i], maxPoints[i]);
     }
     double BFS_end = dtime();
-    std::cout << (BFS_end - BFS_start) << " ";
+    std::cout << "   CPU BFS: " << (BFS_end - BFS_start) << " ";
 
     cout << "\n";
   }

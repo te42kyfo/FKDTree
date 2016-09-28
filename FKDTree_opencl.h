@@ -7,28 +7,18 @@
 #include <vector>
 #include "FKDPoint.h"
 #include "FKDTree.h"
+#include "dtime.hpp"
 #include "ocl.hpp"
-
-#include <sys/time.h>
-namespace {
-double dtime() {
-  double tseconds = 0;
-  struct timeval t;
-  gettimeofday(&t, NULL);
-  tseconds = (double)t.tv_sec + (double)t.tv_usec * 1.0e-6;
-  return tseconds;
-}
-}
 
 #define MAX_INTERMEDIATES 8192
 #define MAX_RESULTS 1024
-#define THREADS_PER_QUERY 4
+#define THREADS_PER_QUERY 2
 
 template <class T, unsigned int nDimensions>
 class FKDTree_OpenCL : public FKDTree<T, nDimensions> {
  public:
   FKDTree_OpenCL(const std::vector<FKDPoint<T, nDimensions>>& points)
-      : ocl(1), nPoints(points.size()), hdSync(false) {
+      : ocl(0), nPoints(points.size()), hdSync(false) {
     // unpacks data from point data structure to linear vectors
     h_ids.resize(nPoints);
     for (unsigned int d = 0; d < nDimensions; d++) {
@@ -163,7 +153,7 @@ class FKDTree_OpenCL : public FKDTree<T, nDimensions> {
                 (uint)minPoints.size());
     ocl.finish();
     double search_end = dtime();
-    std::cout << (search_end - search_start) << " ";
+    std::cout << "     OCL BFS search: " << (search_end - search_start) << " ";
     checkOclErrors(clEnqueueReadBuffer(ocl.queue, d_results, true, 0,
                                        minPoints.size() * sizeof(uint),
                                        h_results.data(), 0, NULL, NULL));
@@ -193,7 +183,7 @@ class FKDTree_OpenCL : public FKDTree<T, nDimensions> {
                 nPoints, d_dimensions, d_dimensions, d_results);
     ocl.finish();
     double search_end = dtime();
-    std::cout << (search_end - search_start) << " ";
+    std::cout << " OCL DFS Search: " << (search_end - search_start) << " ";
     checkOclErrors(clEnqueueReadBuffer(ocl.queue, d_results, true, 0,
                                        minPoints.size() * sizeof(uint),
                                        h_results.data(), 0, NULL, NULL));
@@ -295,7 +285,7 @@ class FKDTree_OpenCL : public FKDTree<T, nDimensions> {
   std::vector<unsigned int> h_ids;
   bool hdSync;
 
-  static const uint blockSize = 64;
+  static const uint blockSize = 2;
   static const uint blockCount = 64;
 };
 
